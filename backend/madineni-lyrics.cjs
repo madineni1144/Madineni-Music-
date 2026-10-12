@@ -255,6 +255,32 @@ function mount(app,pool,options={}) {
       res.set('Retry-After',String(error.retrySeconds||5)).status(503).json({success:false,error:'Lyrics temporarily unavailable. Please try again later.'});
     }
   });
+  app.post('/api/songs/:id/lyrics',async(req,res)=>{
+    const id=String(req.params.id);
+    if(!/^[1-9]\d{0,18}$/.test(id))return res.status(400).json({success:false,error:'Invalid song ID'});
+    const plain=typeof req.body?.plainLyrics==='string'?req.body.plainLyrics.trim():null;
+    const synced=typeof req.body?.syncedLyrics==='string'?req.body.syncedLyrics.trim():null;
+    if(!plain && !synced)return res.status(400).json({success:false,error:'Plain or synced lyrics text is required'});
+    try {
+      await service.ready;
+      const found=await pool.query(SONG_SQL,[id]);
+      const song=found.rows[0];
+      if(!song)return res.status(404).json({success:false,error:'Song not found'});
+      const localVersion=await (options.localIdentity||localIdentity)(song,options.musicDir);
+      const fp=core.fingerprint({...song,file_path:String(song.file_path||'')+'|'+localVersion});
+      const saved=await pool.query(`INSERT INTO madineni_song_lyrics
+        (song_id,fingerprint,status,plain_text,synced_lrc,source,source_url,provider_id,provider_metadata,expires_at,fetched_at,updated_at)
+        VALUES ($1,$2,'found',$3,$4,'manual','local_editor','manual','{}'::jsonb,NULL,NOW(),NOW())
+        ON CONFLICT(song_id) DO UPDATE SET
+          fingerprint=EXCLUDED.fingerprint,status='found',plain_text=EXCLUDED.plain_text,
+          synced_lrc=EXCLUDED.synced_lrc,source='manual',source_url='local_editor',
+          expires_at=NULL,updated_at=NOW() RETURNING *`,
+        [id,fp,plain,synced]);
+      res.json({success:true,data:core.recordPayload(id,saved.rows[0])});
+    }catch(err){
+      res.status(500).json({success:false,error:err.message});
+    }
+  });
   return service;
 }
 module.exports={mount,createService,ensureSchema,findLyrics,localLyrics,localIdentity,limiter,retryAfter,SongNotFound,QueueBusy,ProviderUnavailable,VERSION};

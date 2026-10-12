@@ -75,7 +75,7 @@
       }
       body.append(retry);
     }
-    async function load() {
+    async function load(opts = {}) {
       const song = getSong();
       request?.abort(); clearTimeout(retryTimer);
       const token = ++generation;
@@ -88,7 +88,8 @@
       request = controller;
       const timeout = setTimeout(() => controller.abort(), 45000);
       try {
-        const response = await fetch(`${base}/api/songs/${encodeURIComponent(activeId)}/lyrics`, {signal:controller.signal,cache:'no-store'});
+        const url = `${base}/api/songs/${encodeURIComponent(activeId)}/lyrics${opts.refresh ? '?refresh=1' : ''}`;
+        const response = await fetch(url, {signal:controller.signal,cache:'no-store'});
         if (!response.ok) {
           const seconds = Number(response.headers.get('Retry-After')) || 5;
           const error = new Error('Lyrics are temporarily unavailable.');
@@ -101,7 +102,36 @@
         if (!result.success || !lyric || String(lyric.song_id) !== activeId) throw new Error('Could not load lyrics for this song.');
         body.replaceChildren();
         if (lyric.status === 'instrumental') {body.append(el('p','This track is instrumental.'));return;}
-        if (lyric.status === 'not_found') {body.append(el('p','Lyrics not found for this song.'));return;}
+        if (lyric.status === 'not_found') {
+          body.append(el('p','Lyrics not found on public provider for this song.'));
+          const actionsBox = el('div', undefined, 'mm-lyrics-meta');
+          actionsBox.style.marginTop = '16px';
+          const retryBtn = el('button', '↻ Search Again', 'mm-lyrics-retry');
+          retryBtn.type = 'button';
+          retryBtn.onclick = () => load({ refresh: true });
+          actionsBox.append(retryBtn);
+
+          const addBtn = el('button', '+ Add / Paste Lyrics', 'mm-lyrics-retry');
+          addBtn.type = 'button';
+          addBtn.style.marginLeft = '10px';
+          addBtn.onclick = () => {
+            const input = prompt('Paste plain lyrics or synchronized LRC timestamps for this song:');
+            if (!input || !input.trim()) return;
+            const isSynced = /\[\d{1,3}:\d{1,2}/.test(input);
+            const payload = isSynced ? { syncedLyrics: input.trim() } : { plainLyrics: input.trim() };
+            fetch(`${base}/api/songs/${encodeURIComponent(activeId)}/lyrics`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            }).then(r => r.json()).then(res => {
+              if (res.success) load({ refresh: true });
+              else alert('Failed to save lyrics: ' + (res.error || 'Unknown error'));
+            }).catch(e => alert('Error saving lyrics: ' + e.message));
+          };
+          actionsBox.append(addBtn);
+          body.append(actionsBox);
+          return;
+        }
         if (lyric.status === 'error') {showFailure(body,'The lyrics service is temporarily unavailable.',Date.parse(lyric.retry_after)||0);return;}
         lines = Array.isArray(lyric.lines) ? lyric.lines.filter(x => Number.isFinite(x.time) && x.time>=0 && typeof x.text === 'string') : [];
         const mode = el('span', lines.length ? ' • Timed lyrics' : ' • Plain lyrics');
