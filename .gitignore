@@ -35,3 +35,20 @@ venv/
 **/music/
 **/covers/
 **/staging/
+
+# Retired code pending credential review
+/airflow/retired_dags/
+
+# Historical backups pending review
+*.before-*
+*.backup-*
+*_before_*
+
+# Frontend historical copies
+**/index-before-*
+**/index-backup-*
+**/index-demo-backup.html
+**/index.backup.html
+**/index.stable-working.html
+**/index.working-*.html
+*.save
