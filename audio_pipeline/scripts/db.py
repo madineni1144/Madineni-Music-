@@ -4,7 +4,9 @@ import psycopg2
 from dotenv import load_dotenv
 
 
-ENV_FILE = "/etc/musicapp.env"
+ENV_FILE = os.getenv("MUSICAPP_ENV_FILE", os.getenv("ENV_FILE", "/etc/musicapp.env"))
+# Stage-specific directories are read after importing this module.
+load_dotenv(ENV_FILE)
 
 
 def get_connection():

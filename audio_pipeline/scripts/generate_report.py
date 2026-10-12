@@ -1,4 +1,5 @@
 import argparse
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,7 +13,7 @@ from audio_pipeline.scripts.db import (
 )
 
 
-REPORT_DIR = Path("/opt/musicapp/reports")
+REPORT_DIR = Path(os.getenv("REPORT_DIR", "/opt/musicapp/reports"))
 
 
 def parse_arguments():

@@ -1,40 +1,74 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const { rateLimit } = require("express-rate-limit");
 const path = require("path");
 const { Pool } = require("pg");
-require("dotenv").config({ path: "/opt/musicapp/app/config/.env" });
+const { loadEnvironment, getConfig } = require("./config.cjs");
 
+loadEnvironment();
+
+function createApp({ pool: existingPool, config = getConfig(), lyricsOptions = {} } = {}) {
 const app = express();
 
-const PORT = 3000;
-const FRONTEND_DIR = "/opt/musicapp/app/frontend";
-const MUSIC_DIR = "/opt/musicapp/music/Songs";
-const COVERS_DIR = "/opt/musicapp/covers";
+const FRONTEND_DIR = config.frontendDir;
+const MUSIC_DIR = config.musicDir;
+const COVERS_DIR = config.coversDir;
 
-app.use(cors());
-app.use(express.json());
+app.set("trust proxy", config.trustProxy);
+app.disable("x-powered-by");
+app.use(helmet({
+  // Existing players use inline scripts and onclick handlers.
+  contentSecurityPolicy: false,
+  // Artwork/audio may be used by a separate web or native client.
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  // Keep the existing local HTTP and LAN development workflow.
+  strictTransportSecurity: false,
+}));
+app.use(cors((req, done) => {
+  const origin = req.get("origin");
+  let allowed = !origin || config.corsOrigins.includes(origin);
+  if (origin) {
+    try {
+      const source = new URL(origin);
+      const target = new URL(req.protocol + "://" + req.get("host"));
+      allowed ||= ["http:", "https:"].includes(source.protocol) && source.host === target.host;
+    } catch { /* An invalid Origin receives no CORS permission. */ }
+  }
+  done(null, {
+    origin: allowed,
+    exposedHeaders: ["Accept-Ranges", "Content-Range", "Content-Length", "X-Songs-Page-Limit", "X-Songs-Next-Offset"],
+  });
+}));
+app.use(express.json({ limit: "32kb" }));
 
 app.use(express.static(FRONTEND_DIR));
-app.use("/music", express.static(MUSIC_DIR));
+app.use("/music", express.static(MUSIC_DIR, { maxAge: config.musicCacheMaxAge, acceptRanges: true }));
 app.use("/covers", express.static(COVERS_DIR));
 
-const pool = new Pool({
-host: process.env.DB_HOST,
-port: process.env.DB_PORT,
-database: process.env.DB_NAME,
-user: process.env.DB_USER,
-password: process.env.DB_PASSWORD,
-max: 10,
-idleTimeoutMillis: 30000,
-connectionTimeoutMillis: 5000
-});
+// Audio Range requests and artwork are deliberately outside API rate limits.
+app.use("/api", rateLimit({
+  windowMs: 60000, limit: config.apiRateLimit,
+  standardHeaders: "draft-7", legacyHeaders: false,
+  skip: req => req.path === "/health" || req.method === "OPTIONS",
+  message: { success: false, error: "Too many API requests. Please try again shortly." },
+}));
+app.use("/api/songs/:id/lyrics", rateLimit({
+  windowMs: 60000, limit: config.lyricsRateLimit,
+  standardHeaders: "draft-7", legacyHeaders: false,
+  skip: req => req.method === "OPTIONS",
+  message: { success: false, error: "Too many lyrics requests. Please try again shortly." },
+}));
+
+const pool = existingPool || new Pool(config.db);
+pool.on?.("error", error => console.error("Database pool error:", error.message));
 
 /* =========================
 ROOT
 ========================= */
 
 // MADINENI LYRICS START
-require("./madineni-lyrics.cjs").mount(app, pool, {musicDir:MUSIC_DIR});
+require("./madineni-lyrics.cjs").mount(app, pool, { ...lyricsOptions, musicDir: MUSIC_DIR });
 // MADINENI LYRICS END
 
 
@@ -138,6 +172,10 @@ const album =
     ? req.query.album.trim()
     : "";
 
+if ([search, artist, album].some(value => value.length > 200)) {
+  return res.status(400).json({ error: "Search filters must be 200 characters or fewer" });
+}
+
 let limit =
   Number.parseInt(
     req.query.limit,
@@ -151,18 +189,18 @@ let offset =
   );
 
 if (
-  !Number.isInteger(limit) ||
+  !Number.isSafeInteger(limit) ||
   limit <= 0
 ) {
-  limit = 1000000;
+  limit = config.songsDefaultLimit;
 }
 
-if (limit > 1000000) {
-  limit = 1000000;
+if (limit > config.songsMaxLimit) {
+  limit = config.songsMaxLimit;
 }
 
 if (
-  !Number.isInteger(offset) ||
+  !Number.isSafeInteger(offset) ||
   offset < 0
 ) {
   offset = 0;
@@ -235,7 +273,8 @@ const whereClause =
     : "";
 
 
-values.push(limit);
+// Fetch one extra row to advertise a next page without changing the JSON array.
+values.push(limit + 1);
 const limitParameter = parameter;
 parameter++;
 
@@ -279,7 +318,11 @@ const result =
     values
   );
 
-res.json(result.rows);
+res.set("X-Songs-Page-Limit", String(limit));
+if (result.rows.length > limit) {
+  res.set("X-Songs-Next-Offset", String(offset + limit));
+}
+res.json(result.rows.slice(0, limit));
 
 } catch (error) {
 
@@ -364,7 +407,8 @@ const result =
       songs.file_path,
       songs.file_format,
       songs.file_size,
-      songs.created_at
+      songs.created_at,
+      COALESCE(NULLIF(albums.cover_path, ''), '/covers/' || songs.id || '.jpg') AS cover_art
 
     FROM songs
 
@@ -645,6 +689,13 @@ if (!name) {
     error: "Playlist name is required"
   });
 
+}
+
+if (name.length > 120 || description.length > 2000) {
+  return res.status(400).json({
+    success: false,
+    error: "Playlist name must be 120 characters or fewer and description 2000 characters or fewer"
+  });
 }
 
 const result =
@@ -1011,31 +1062,45 @@ path: req.path
 
 });
 
+app.use((error, req, res, next) => {
+  if (error.type === "entity.too.large") {
+    return res.status(413).json({ success: false, error: "Request body is too large" });
+  }
+  if (error instanceof SyntaxError && error.status === 400 && "body" in error) {
+    return res.status(400).json({ success: false, error: "Invalid JSON request body" });
+  }
+  console.error("Request failed:", error.message);
+  res.status(500).json({ success: false, error: "Request could not be completed" });
+});
+
+return { app, pool, config };
+}
+
 /* =========================
 SERVER
 ========================= */
 
+if (require.main === module) {
+const { app, config } = createApp();
 app.listen(
-PORT,
-"0.0.0.0",
+config.port,
+config.host,
 () => {
 
 console.log("");
 console.log("======================================");
 console.log("       MUSIC APP API SERVER");
 console.log("======================================");
-console.log("Port:      " + PORT);
+console.log("Port:      " + config.port);
 console.log(
-  "Local:     http://127.0.0.1:" + PORT
+  "Local:     http://127.0.0.1:" + config.port
 );
-console.log(
-  "Wi-Fi:     http://192.168.4.204:" + PORT
-);
-console.log(
-  "Tailscale: http://100.83.79.17:" + PORT
-);
+if (config.publicUrl) console.log("Public:    " + config.publicUrl);
 console.log("======================================");
 console.log("");
 
 }
 );
+}
+
+module.exports = { createApp };

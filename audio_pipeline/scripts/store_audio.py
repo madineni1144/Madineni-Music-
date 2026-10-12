@@ -12,7 +12,7 @@ from audio_pipeline.scripts.db import (
     mark_import_item_failed,
 )
 
-MUSIC_ROOT = Path("/opt/musicapp/music/Songs")
+MUSIC_ROOT = Path(os.getenv("MUSIC_DIR", "/opt/musicapp/music/Songs"))
 
 
 def safe_name(value):

@@ -193,6 +193,38 @@ button.active-control{color:#ff1744}
 <div id="full" class="full"><div class="fulltop"><button id="collapse">⌄</button><b>NOW PLAYING</b><button id="heart">♡</button></div><div class="fullbody"><div class="bigart">♫</div><div><h1 id="fullTitle">Naa Praanam</h1><div class="muted" id="fullAlbum">Devara</div><div class="fullseek"><input id="fullSeek" type="range" min="0" max="262" value="0"><div class="seekline"><span id="fullTime">0:00</span><span style="margin-left:auto">4:22</span></div></div><div class="fullbuttons"><button id="fullShuffle"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h2.5a6 6 0 0 0 5-3l5-9a6 6 0 0 1 5-3H22"/><path d="M2 6h2.5a6 6 0 0 1 5 3l.5 1"/><path d="M14 15l.5 1a6 6 0 0 0 5 3H22"/></svg></button><button id="fullPrev"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="4" x2="5" y2="20"/></svg></button><button class="mainplay" id="fullToggle"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="7 4 20 12 7 20 7 4"/></svg></button><button id="fullNext"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="4" x2="19" y2="20"/></svg></button><button id="fullRepeat"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></button></div><div class="switches"><button id="lyricsTab">Lyrics</button><button id="queueTab">Up next</button><button>Related</button></div><div class="panel" id="detailPanel"><p>Lyrics preview<br><span class="current">♪ Current synchronized lyric line</span><br>Next lyric line appears here<br>Lyrics can later load from your server.</p></div></div></div></div>
 <script>
 const API_BASE = location.origin;
+// MADINENI SONG PAGINATION START
+async function loadAllSongs(url) {
+  const songs = [];
+  const pageSize = 500;
+  let offset = 0;
+  while (true) {
+    const target = new URL(url, location.href);
+    target.searchParams.set('limit', String(pageSize));
+    target.searchParams.set('offset', String(offset));
+    const response = await fetch(target.toString());
+    if (!response.ok) throw new Error('Songs API ' + response.status);
+    const payload = await response.json();
+    const rows = Array.isArray(payload) ? payload : payload.data;
+    if (!Array.isArray(rows)) throw new Error('Invalid songs response');
+    for (const song of rows) songs.push(song);
+    const next = response.headers.get('X-Songs-Next-Offset');
+    if (next !== null) {
+      const nextOffset = Number(next);
+      if (!Number.isSafeInteger(nextOffset) || nextOffset !== offset + rows.length || !rows.length) {
+        throw new Error('Invalid songs pagination');
+      }
+      offset = nextOffset;
+    } else {
+      // A new server tells us when the final page has been reached.
+      // An older server has no paging headers; continue only for a full page.
+      if (response.headers.get('X-Songs-Page-Limit') !== null || rows.length !== pageSize) return songs;
+      offset += rows.length;
+    }
+  }
+}
+// MADINENI SONG PAGINATION END
+
 const SONGS_API = `${API_BASE}/api/songs`;
 const audio = new Audio();
 audio.preload = "auto";
@@ -744,7 +776,7 @@ document.querySelectorAll("[data-library]").forEach(b=>{
 
 async function init(){
   $("quick").innerHTML='<p class="status">Loading your music library…</p>';
-  try{const r=await fetch(SONGS_API);if(!r.ok)throw new Error(`API ${r.status}`);data=await r.json();if(!Array.isArray(data)||!data.length)throw new Error("No songs returned");render();
+  try{data=await loadAllSongs(SONGS_API);if(!Array.isArray(data)||!data.length)throw new Error("No songs returned");render();
   if(data.length && !playQueue.length){
     buildQueue(data,data[0].id,"Library");
   }

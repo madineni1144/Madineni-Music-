@@ -1,0 +1,5 @@
+**
+!airflow/
+!airflow/Dockerfile
+!audio_pipeline/
+!audio_pipeline/requirements.txt

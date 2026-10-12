@@ -42,4 +42,6 @@ Database: `music_app`
 Audio, artwork, database dumps, passwords, and tunnel credentials are excluded from this public repository. GitHub stores the application source; Ubuntu continues hosting the service and data.
 
 ## Migration Status
-Repository documentation prepared. Ubuntu source files and the iOS project have not yet been uploaded. Review source for hard-coded credentials before committing.
+Backend, web players, lyrics integration, and audio pipeline source are now tracked. The native iOS project still needs to be added separately.
+
+See [the compatible update guide](docs/compatible-update.md) for the reliability changes, verification steps, backup and rollback procedure. Keep bounded pagination disabled until the native iOS client has been checked.

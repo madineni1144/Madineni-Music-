@@ -17,7 +17,7 @@ TOKEN_FILE = Path(
     )
 )
 
-REPORT_DIR = Path("/opt/musicapp/reports")
+REPORT_DIR = Path(os.getenv("REPORT_DIR", "/opt/musicapp/reports"))
 
 EXCEL_FOLDER_ID = (
     "180BvxOQaclFXhFNBN0UHX4B5o2thALhL"

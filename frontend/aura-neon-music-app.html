@@ -108,6 +108,38 @@ const state={songs:[],albums:[],artists:[],playlists:[],favorites:JSON.parse(loc
 const nav=[['player','⌂','Home'],['songs','♫','Songs'],['albums','▦','Albums'],['artists','♙','Artists'],['favorites','♥','Favorites'],['playlists','☷','Playlists']];
 const API=window.MUSIC_API_BASE||'';
 function api(path){return fetch(API+path).then(r=>{if(!r.ok)throw Error(r.status);return r.json()})}
+// MADINENI SONG PAGINATION START
+async function loadAllSongs(url) {
+  const songs = [];
+  const pageSize = 500;
+  let offset = 0;
+  while (true) {
+    const target = new URL(url, location.href);
+    target.searchParams.set('limit', String(pageSize));
+    target.searchParams.set('offset', String(offset));
+    const response = await fetch(target.toString());
+    if (!response.ok) throw new Error('Songs API ' + response.status);
+    const payload = await response.json();
+    const rows = Array.isArray(payload) ? payload : payload.data;
+    if (!Array.isArray(rows)) throw new Error('Invalid songs response');
+    for (const song of rows) songs.push(song);
+    const next = response.headers.get('X-Songs-Next-Offset');
+    if (next !== null) {
+      const nextOffset = Number(next);
+      if (!Number.isSafeInteger(nextOffset) || nextOffset !== offset + rows.length || !rows.length) {
+        throw new Error('Invalid songs pagination');
+      }
+      offset = nextOffset;
+    } else {
+      // A new server tells us when the final page has been reached.
+      // An older server has no paging headers; continue only for a full page.
+      if (response.headers.get('X-Songs-Page-Limit') !== null || rows.length !== pageSize) return songs;
+      offset += rows.length;
+    }
+  }
+}
+// MADINENI SONG PAGINATION END
+
 function openScreen(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));document.getElementById(id)?.classList.add('active');document.querySelectorAll('.nav button,.bottom button').forEach(b=>b.classList.toggle('active',b.dataset.screen===id))}
 function setupNav(){const html=nav.map(([id,icon,name])=>`<button data-screen="${id}" onclick="openScreen('${id}')"><span>${icon}</span>${name}</button>`).join('');document.getElementById('sideNav').innerHTML=html;document.getElementById('bottomNav').innerHTML=html}
 function img(src){return src?`<img src="${src}" alt="">`:''}
@@ -142,7 +174,7 @@ async function load(){
  const endpoints=[
    ['/api/songs','songs'],['/api/albums','albums'],['/api/artists','artists'],['/api/playlists','playlists']
  ];
- for(const [url,key] of endpoints){try{const r=await api(url);state[key]=Array.isArray(r)?r:(r.data||r[key]||[])}catch(e){console.warn('Could not load',url,e)}}
+ for(const [url,key] of endpoints){try{const r=key==='songs'?await loadAllSongs(API+url):await api(url);state[key]=Array.isArray(r)?r:(r.data||r[key]||[])}catch(e){console.warn('Could not load',url,e)}}
  renderSongs();renderAlbums();renderArtists();renderFavorites();renderPlaylists();renderRecent();
 }
 load();
