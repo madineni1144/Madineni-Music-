@@ -18,10 +18,19 @@ function normalize(value) {
     .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
 }
 function titleKey(value) {
-  return normalize(clean(value).replace(/\s*[-–]?\s*[([]from\s+[\s\S]*?[)\]]\s*$/i, ''));
+  let s = clean(value)
+    .replace(/\s*[-–]?\s*[([]from\s+[\s\S]*?[)\]]\s*$/i, '')
+    .replace(/\s*[([](?:feat\.?|featuring)\s+[^)\]]+[)\]]/gi, '')
+    .replace(/\s*[([](?:remaster(?:ed)?|deluxe|bonus\s*track|official\s*(?:audio|video)|lyric(?:al)?\s*video|version|edit|mix)[)\]]/gi, '')
+    .replace(/\s*[-–]\s*(?:remaster(?:ed)?|deluxe|version|edit|mix)\s*$/i, '');
+  return normalize(s);
 }
 function albumKey(value) {
-  return normalize(clean(value).replace(/\s*[([](?:original\s+)?(?:motion\s+picture\s+)?soundtrack[)\]]/gi, ''));
+  let s = clean(value)
+    .replace(/\s*[([](?:original\s+)?(?:motion\s+picture\s+)?soundtrack[)\]]/gi, '')
+    .replace(/\s*[([](?:deluxe|expanded|remaster(?:ed)?|bonus|special|edition|version)\s*[)\]]/gi, '')
+    .replace(/\s*[-–]\s*(?:deluxe|expanded|remaster(?:ed)?|special\s*edition)\s*$/i, '');
+  return normalize(s);
 }
 function known(value) {
   const s = normalize(value);
@@ -48,19 +57,41 @@ function fingerprint(song) {
 }
 function matchScore(song, record) {
   const m = metadata(song);
-  if (!record || !m.title || titleKey(m.title) !== titleKey(record.trackName || record.name)) return -1;
+  if (!record || !m.title) return -1;
+  const tLocal = titleKey(m.title);
+  const tRemote = titleKey(record.trackName || record.name);
+  if (!tLocal || !tRemote) return -1;
+
+  // Title match: exact or clean substring containment
+  const titleMatch = tLocal === tRemote || (tLocal.length > 5 && (tRemote.startsWith(tLocal) || tLocal.startsWith(tRemote)));
+  if (!titleMatch) return -1;
+
   if (record.instrumental !== true && !record.plainLyrics?.trim() && !parseLrc(record.syncedLyrics).length) return -1;
-  const albumMatch = !!m.album && albumKey(m.album) === albumKey(record.albumName);
+
+  const aLocal = m.album ? albumKey(m.album) : '';
+  const aRemote = record.albumName ? albumKey(record.albumName) : '';
+  const albumMatch = !!aLocal && (aLocal === aRemote || (aLocal.length > 5 && (aRemote.includes(aLocal) || aLocal.includes(aRemote))));
   const artistMatch = !!m.artist && artists(m.artist).some(a => artists(record.artistName).includes(a));
-  // Never use a title alone: film songs and language versions can share it.
-  if (m.album && !albumMatch) return -1;
-  if (m.artist && !artistMatch) return -1;
-  if (!albumMatch && !artistMatch) return -1;
+
+  // Must match at least artist OR album (never title alone if artist or album is known)
+  if (m.artist && m.album) {
+    if (!artistMatch && !albumMatch) return -1;
+  } else if (m.artist) {
+    if (!artistMatch) return -1;
+  } else if (m.album) {
+    if (!albumMatch) return -1;
+  }
+
   const rd = Number(record.duration);
   const diff = m.duration !== null && Number.isFinite(rd) && rd > 0 ? Math.abs(m.duration - rd) : null;
-  if (m.duration !== null && (diff === null || diff > 2)) return -1;
-  return 100 + (albumMatch ? 30 : 0) + (artistMatch ? 30 : 0) + (diff === null ? 0 : 10 - diff)
-    + (record.syncedLyrics?.trim() ? 5 : 0);
+  // Allow up to 8 seconds tolerance for encoding padding / silence
+  if (m.duration !== null && diff !== null && diff > 8) return -1;
+
+  return 100
+    + (artistMatch ? 40 : 0)
+    + (albumMatch ? 20 : 0)
+    + (diff === null ? 0 : Math.max(0, 10 - diff))
+    + (record.syncedLyrics?.trim() ? 10 : 0);
 }
 function pickMatch(song, records) {
   const ranked = (Array.isArray(records) ? records : []).map(r => ({r, score:matchScore(song,r)}))

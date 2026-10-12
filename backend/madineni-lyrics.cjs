@@ -130,7 +130,8 @@ async function localLyrics(song,musicDir) {
     }catch{/* Missing sidecar: try embedded tags, then the provider. */}
   }
   try {
-    const {stdout}=await execFile('python3',[path.join(__dirname,'read-embedded-lyrics.py'),audioFile],{timeout:4000,maxBuffer:MAX_LYRICS_BYTES*3});
+    const pyBin = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
+    const {stdout}=await execFile(pyBin,[path.join(__dirname,'read-embedded-lyrics.py'),audioFile],{timeout:4000,maxBuffer:MAX_LYRICS_BYTES*3});
     const embedded=JSON.parse(stdout);
     if(embedded.plainLyrics?.trim() || core.parseLrc(embedded.syncedLyrics).length) return {...embedded,source:'embedded'};
   }catch{/* Mutagen is optional; provider lookup still works. */}
@@ -144,34 +145,54 @@ async function findLyrics(song,queue=provider) {
   if(m.album)base.album_name=m.album;
   if(m.duration!==null && m.duration<=3600)base.duration=String(m.duration);
   if(m.artist){
-    const direct=await queue.request('/api/get',base);
-    const match=core.pickMatch(song,direct?[direct]:[]);
+    try {
+      const direct=await queue.request('/api/get',base);
+      const match=core.pickMatch(song,direct?[direct]:[]);
+      if(match)return match;
+    } catch(e) {
+      if(e instanceof QueueBusy || e instanceof ProviderUnavailable) throw e;
+    }
+  }
+
+  // Primary search: track_name AND artist_name
+  if(m.artist){
+    const res=await queue.request('/api/search',{track_name:m.title,artist_name:m.artist});
+    const match=core.pickMatch(song,res);
     if(match)return match;
   }
-  const params={track_name:m.title};
-  if(m.album)params.album_name=m.album;
-  else if(m.artist)params.artist_name=m.artist;
-  const first=await queue.request('/api/search',params);
-  let match=core.pickMatch(song,first);
-  if(match)return match;
-  if(m.album || m.artist){
-    match=core.pickMatch(song,await queue.request('/api/search',{track_name:m.title}));
+
+  // Secondary search: track_name AND album_name
+  if(m.album){
+    const res=await queue.request('/api/search',{track_name:m.title,album_name:m.album});
+    const match=core.pickMatch(song,res);
+    if(match)return match;
   }
-  return match;
+
+  // Broad query string search: "title artist"
+  const qStr=(m.artist?`${m.title} ${m.artist}`:m.title).trim();
+  const resQ=await queue.request('/api/search',{q:qStr});
+  let match=core.pickMatch(song,resQ);
+  if(match)return match;
+
+  // Final fallback: track_name alone
+  const resTitle=await queue.request('/api/search',{track_name:m.title});
+  return core.pickMatch(song,resTitle);
 }
 function createService(pool,options={}) {
   const ready=options.skipSchema?Promise.resolve():ensureSchema(pool);
   // Observe failures immediately; every endpoint also awaits ready.
   ready.catch(()=>{});
   const running=new Map();
-  async function retrieve(song) {
+  async function retrieve(song, {refresh=false}={}) {
     // Added or edited sidecars invalidate even cached misses immediately.
     const localVersion=await (options.localIdentity||localIdentity)(song,options.musicDir);
     const fp=core.fingerprint({...song,file_path:String(song.file_path||'')+'|'+localVersion});
-    const cached=await pool.query('SELECT * FROM madineni_song_lyrics WHERE song_id=$1',[song.id]);
-    const row=cached.rows[0];
-    if(row && row.fingerprint===fp && (!row.expires_at || new Date(row.expires_at).getTime()>Date.now()))return row;
-    let record=null,status='not_found',expires=new Date(Date.now()+7*86400000),source='lrclib';
+    if(!refresh) {
+      const cached=await pool.query('SELECT * FROM madineni_song_lyrics WHERE song_id=$1',[song.id]);
+      const row=cached.rows[0];
+      if(row && row.fingerprint===fp && (!row.expires_at || new Date(row.expires_at).getTime()>Date.now()))return row;
+    }
+    let record=null,status='not_found',expires=new Date(Date.now()+3600000),source='lrclib'; // 1 hour negative cache
     try {
       record=await (options.localLyrics||localLyrics)(song,options.musicDir);
       if(!record)record=await findLyrics(song,options.provider||provider);
@@ -198,16 +219,17 @@ function createService(pool,options={}) {
       [song.id,fp,status,plain,synced,source,url,id,JSON.stringify(details),expires]);
     return saved.rows[0];
   }
-  async function get(id) {
+  async function get(id, opts={}) {
     await ready;
     const found=await pool.query(SONG_SQL,[id]);
     const song=found.rows[0];
     if(!song)throw new SongNotFound();
-    if(running.has(String(id)))return running.get(String(id));
+    const runKey = `${id}:${opts.refresh ? '1' : '0'}`;
+    if(running.has(runKey))return running.get(runKey);
     if(running.size>=4)throw new QueueBusy();
-    const task=retrieve(song).then(row=>core.recordPayload(id,row));
-    running.set(String(id),task);
-    try{return await task;}finally{running.delete(String(id));}
+    const task=retrieve(song, opts).then(row=>core.recordPayload(id,row));
+    running.set(runKey,task);
+    try{return await task;}finally{running.delete(runKey);}
   }
   return {get,ready};
 }
@@ -226,7 +248,8 @@ function mount(app,pool,options={}) {
   app.get('/api/songs/:id/lyrics',async(req,res)=>{
     const id=String(req.params.id);
     if(!/^[1-9]\d{0,18}$/.test(id) || BigInt(id)>9223372036854775807n)return res.status(400).json({success:false,error:'Invalid song ID'});
-    try {res.set('Cache-Control','no-store').json({success:true,data:await service.get(id)});}
+    const refresh = req.query.refresh === '1' || req.query.refresh === 'true';
+    try {res.set('Cache-Control','no-store').json({success:true,data:await service.get(id, {refresh})});}
     catch(error) {
       if(error instanceof SongNotFound)return res.status(404).json({success:false,error:'Song not found'});
       res.set('Retry-After',String(error.retrySeconds||5)).status(503).json({success:false,error:'Lyrics temporarily unavailable. Please try again later.'});

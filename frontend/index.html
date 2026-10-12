@@ -151,6 +151,7 @@ button,input{font:inherit} button{color:inherit;border:0;cursor:pointer}
   </div>
   <div class="top-actions">
     <button class="icon-btn" onclick="openScreen('dsp')" aria-label="Audio settings" title="Audio settings">⚙️</button>
+    <button class="pill" id="topLyricsPill" onclick="document.getElementById('lyricsTab')?.click()">Lyrics</button>
     <button class="pill active" onclick="openScreen('player')">Now Playing</button>
   </div>
 </header>
@@ -173,6 +174,7 @@ button,input{font:inherit} button{color:inherit;border:0;cursor:pointer}
         <button class="control play" id="play" onclick="togglePlay()" title="Play / Pause" aria-label="Play / Pause">▶</button>
         <button class="control" onclick="next()" title="Next" aria-label="Next">⏭</button>
         <button class="control" id="repeat" onclick="toggleLoop()" title="Repeat" aria-label="Repeat" aria-pressed="false">🔁</button>
+        <button class="control" id="lyricsTab" title="Lyrics" aria-label="Lyrics" aria-pressed="false">🎤</button>
       </div>
       <div class="quick">
         <div class="card row"><span>Smart Crossfade</span><button id="cross" class="switch on" onclick="this.classList.toggle('on')"><i></i></button></div>
