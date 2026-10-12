@@ -29,7 +29,7 @@ TOKEN_FILE = Path(
 )
 
 INCOMING_FOLDER_ID = "1QZWFD51jh4_gtHOBfi7bauhJLB9_QTaC"
-STAGING_DIR = Path("/opt/musicapp/staging/incoming")
+STAGING_DIR = Path(os.getenv("STAGING_DIR", "/opt/musicapp/staging/incoming"))
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 

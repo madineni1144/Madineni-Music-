@@ -15,7 +15,7 @@ BASE_URL = os.getenv(
     "http://127.0.0.1:3000",
 ).rstrip("/")
 
-MUSIC_ROOT = Path("/opt/musicapp/music/Songs").resolve()
+MUSIC_ROOT = Path(os.getenv("MUSIC_DIR", "/opt/musicapp/music/Songs")).resolve()
 
 
 def parse_arguments():

@@ -1,17 +1,17 @@
 // MADINENI LYRICS V1
 'use strict';
-const path=require('node:path');
-require('dotenv').config({path:path.join(__dirname,'../config/.env'),quiet:true});
+const {loadEnvironment,getConfig}=require('./config.cjs');
+loadEnvironment();
+const config=getConfig();
 const {Pool}=require('pg');
 const {createService}=require('./madineni-lyrics.cjs');
 const arg=process.argv.indexOf('--limit');
 const limit=arg<0?100:Number(process.argv[arg+1]);
 if(!Number.isInteger(limit)||limit<1||limit>20000){console.error('Use --limit 1 through 20000');process.exit(2);}
-const pool=new Pool({host:process.env.DB_HOST,port:process.env.DB_PORT,database:process.env.DB_NAME,
-  user:process.env.DB_USER,password:process.env.DB_PASSWORD,max:2,connectionTimeoutMillis:5000});
+const pool=new Pool({...config.db,max:2});
 (async()=>{
   try {
-    const service=createService(pool,{musicDir:process.env.MUSIC_DIR||'/opt/musicapp/music/Songs'});
+    const service=createService(pool,{musicDir:config.musicDir});
     await service.ready;
     const result=await pool.query(`SELECT s.id,s.title FROM songs s LEFT JOIN madineni_song_lyrics l ON l.song_id=s.id
       WHERE l.song_id IS NULL OR l.expires_at<=NOW() ORDER BY s.id LIMIT $1`,[limit]);

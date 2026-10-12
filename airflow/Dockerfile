@@ -9,7 +9,10 @@ RUN apt-get update \
 
 USER airflow
 
+COPY --chown=airflow:0 audio_pipeline/requirements.txt /tmp/music-requirements.txt
+
 RUN pip install --no-cache-dir \
+    "apache-airflow==${AIRFLOW_VERSION}" \
+    -r /tmp/music-requirements.txt \
     mutagen \
-    pillow \
-    openpyxl==3.1.5
+    pillow

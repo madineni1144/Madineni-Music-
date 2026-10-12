@@ -130,7 +130,8 @@ async function localLyrics(song,musicDir) {
     }catch{/* Missing sidecar: try embedded tags, then the provider. */}
   }
   try {
-    const {stdout}=await execFile('python3',[path.join(__dirname,'read-embedded-lyrics.py'),audioFile],{timeout:4000,maxBuffer:MAX_LYRICS_BYTES*3});
+    const python = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
+    const {stdout}=await execFile(python,[path.join(__dirname,'read-embedded-lyrics.py'),audioFile],{timeout:4000,maxBuffer:MAX_LYRICS_BYTES*3});
     const embedded=JSON.parse(stdout);
     if(embedded.plainLyrics?.trim() || core.parseLrc(embedded.syncedLyrics).length) return {...embedded,source:'embedded'};
   }catch{/* Mutagen is optional; provider lookup still works. */}
