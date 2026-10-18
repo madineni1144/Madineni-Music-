@@ -149,6 +149,37 @@ button.active-control{color:#ff1744}
   accent-color: #f04455 !important;
 }
 
+
+/* Telugu-first discovery home */
+#home .hero{min-height:270px;padding:30px;border:1px solid #ffffff18;background:radial-gradient(circle at 78% 30%,#8d492e 0,#48271c 25%,#171313 62%,#101010 82%);box-shadow:0 18px 60px #0008}
+#home .hero:after{color:#e49a67;opacity:.12}
+#home .hero>div{position:relative;z-index:1;max-width:75%}
+#home .hero .eyebrow{color:#f0a36b;letter-spacing:1.2px}
+#home .hero h1{font-size:clamp(38px,6vw,60px);line-height:1;margin:10px 0}
+#home .hero p{font-size:15px;color:#d3cfcc;line-height:1.45;max-width:680px}
+#home .hero .play{background:#d77a43;color:#fff;border-radius:50px}
+#home .chip.active{background:#482a1d;color:#fff;border:1px solid #895234}
+#home .chip:hover{background:#33231c}
+#home .section{margin-top:30px}
+#home .section h2{font-size:23px;margin-bottom:12px}
+#home .sectionhead{align-items:center;margin-bottom:12px}
+#home .sectionhead h2{margin:0}
+#home .sectionhead button{color:#e59a65;font-weight:700}
+#home .sectionhead small{display:block;color:#aaa;font-size:11px;letter-spacing:.9px;margin-bottom:4px}
+.chart-list{display:grid;gap:4px}
+.chart-row{display:grid;grid-template-columns:36px 50px minmax(0,1fr) 32px;gap:11px;align-items:center;padding:7px;border-radius:10px}
+.chart-row:hover{background:#ffffff09}
+.chart-rank{color:#d78a5b;text-align:center;font-size:13px}
+.chart-art{width:50px;height:50px;border-radius:7px;overflow:hidden;background:linear-gradient(135deg,#6838b7,#c75441);display:grid;place-items:center}
+.chart-art img{width:100%;height:100%;object-fit:cover}
+.chart-copy{min-width:0}
+.chart-copy b,.chart-copy small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart-copy small{color:#aaa;margin-top:4px}
+.chart-row button{border:0;background:none;color:#ddd;cursor:pointer;font-size:18px}
+.chart-status{color:#aaa;padding:12px 8px}
+.chart-source{color:#999;font-size:11px}
+@media(max-width:750px){#home .hero{min-height:225px;padding:22px}#home .hero>div{max-width:100%}#home .hero h1{font-size:38px}#home .section h2{font-size:20px}.chart-row{grid-template-columns:26px 46px minmax(0,1fr) 28px;gap:8px}.chart-art{width:46px;height:46px}}
+
 </style>
 
 <!-- MADINENI HOME SCREEN START -->
@@ -168,9 +199,10 @@ button.active-control{color:#ff1744}
 <div class="search">⌕ <input id="globalSearch" placeholder="Search songs, albums, artists"></div><button class="iconbtn">◉</button><div class="avatar">RK</div></header>
 <main>
 <section id="home" class="page active">
-<div class="chips"><button class="chip active">All</button><button class="chip">Relax</button><button class="chip">Energize</button><button class="chip">Telugu</button><button class="chip">Romance</button><button class="chip">Workout</button></div>
-<div class="hero"><div><div class="eyebrow">MADE FOR YOU</div><h1>Telugu Supermix</h1><p id="heroDescription">Your music library</p><button class="play" id="heroPlay">▶ Play</button><button class="secondary" id="heroSave" aria-pressed="false">＋ Save</button></div></div>
-<div class="section"><div class="sectionhead"><h2>Quick picks</h2><button id="quickPlayAll">Play all</button></div><div class="rowlist" id="quick"></div></div>
+<div class="chips" aria-label="Browse music"><button class="chip home-chip active" data-browse="telugu">Telugu</button><button class="chip home-chip" data-browse="trending">Trending</button><button class="chip home-chip" data-browse="albums">Albums</button><button class="chip home-chip" data-browse="artists">Artists</button><button class="chip home-chip" data-browse="moods">Mood</button></div>
+<div class="hero"><div><div class="eyebrow">MADE FOR YOU</div><h1>Telugu Hits</h1><p id="heroDescription">A personal mix from your music collection</p><button class="play" id="heroPlay">▶ Play mix</button><button class="secondary" id="heroSave" aria-pressed="false">＋ Save mix</button></div></div>
+<div class="section"><div class="sectionhead"><h2>Quick picks</h2><button onclick="playHomeQueue()">Play all</button></div><div class="rowlist" id="quick"></div></div>
+<div class="section" id="homeTrendingSection"><div class="sectionhead"><div><small>LIVE INTERNET CHART</small><h2>Trending in India</h2></div><button onclick="openTrending()">See all ›</button></div><div class="chart-list" id="homeTrending"><div class="chart-status">Loading current chart…</div></div></div>
 <div class="section"><h2>Listen again</h2><div class="grid" id="listen"></div></div>
 <div class="section"><h2>Recommended albums</h2><div class="grid" id="albums"></div></div>
 <div class="section"><h2>Your favorite artists</h2><div class="grid round" id="artists"></div></div>
@@ -178,7 +210,7 @@ button.active-control{color:#ff1744}
 <section id="explore" class="page">
 <h1 class="title">Explore</h1><div class="chips"><button class="chip active">New releases</button><button class="chip">Charts</button><button class="chip">Moods & genres</button></div>
 <div class="section"><h2>New albums & singles</h2><div class="grid" id="newalbums"></div></div>
-<div class="section"><h2>Trending songs</h2><div class="rowlist" id="trending"></div></div>
+<div class="section" id="trendingSection"><div class="sectionhead"><div><small class="chart-source">Apple Music RSS · India Top 100</small><h2>Trending songs</h2></div><button onclick="loadTrending(true)">Refresh</button></div><div class="chart-list" id="trending"><div class="chart-status">Loading current chart…</div></div></div>
 <div class="section"><h2>Moods & genres</h2><div class="grid" id="genres"></div></div>
 </section>
 <section id="library" class="page">
@@ -193,38 +225,17 @@ button.active-control{color:#ff1744}
 <div id="full" class="full"><div class="fulltop"><button id="collapse">⌄</button><b>NOW PLAYING</b><button id="heart">♡</button></div><div class="fullbody"><div class="bigart">♫</div><div><h1 id="fullTitle">Naa Praanam</h1><div class="muted" id="fullAlbum">Devara</div><div class="fullseek"><input id="fullSeek" type="range" min="0" max="262" value="0"><div class="seekline"><span id="fullTime">0:00</span><span style="margin-left:auto">4:22</span></div></div><div class="fullbuttons"><button id="fullShuffle"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h2.5a6 6 0 0 0 5-3l5-9a6 6 0 0 1 5-3H22"/><path d="M2 6h2.5a6 6 0 0 1 5 3l.5 1"/><path d="M14 15l.5 1a6 6 0 0 0 5 3H22"/></svg></button><button id="fullPrev"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="4" x2="5" y2="20"/></svg></button><button class="mainplay" id="fullToggle"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="7 4 20 12 7 20 7 4"/></svg></button><button id="fullNext"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="4" x2="19" y2="20"/></svg></button><button id="fullRepeat"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></button></div><div class="switches"><button id="lyricsTab">Lyrics</button><button id="queueTab">Up next</button><button>Related</button></div><div class="panel" id="detailPanel"><p>Lyrics preview<br><span class="current">♪ Current synchronized lyric line</span><br>Next lyric line appears here<br>Lyrics can later load from your server.</p></div></div></div></div>
 <script>
 const API_BASE = location.origin;
-// MADINENI SONG PAGINATION START
-async function loadAllSongs(url) {
-  const songs = [];
-  const pageSize = 500;
-  let offset = 0;
-  while (true) {
-    const target = new URL(url, location.href);
-    target.searchParams.set('limit', String(pageSize));
-    target.searchParams.set('offset', String(offset));
-    const response = await fetch(target.toString());
-    if (!response.ok) throw new Error('Songs API ' + response.status);
-    const payload = await response.json();
-    const rows = Array.isArray(payload) ? payload : payload.data;
-    if (!Array.isArray(rows)) throw new Error('Invalid songs response');
-    for (const song of rows) songs.push(song);
-    const next = response.headers.get('X-Songs-Next-Offset');
-    if (next !== null) {
-      const nextOffset = Number(next);
-      if (!Number.isSafeInteger(nextOffset) || nextOffset !== offset + rows.length || !rows.length) {
-        throw new Error('Invalid songs pagination');
-      }
-      offset = nextOffset;
-    } else {
-      // A new server tells us when the final page has been reached.
-      // An older server has no paging headers; continue only for a full page.
-      if (response.headers.get('X-Songs-Page-Limit') !== null || rows.length !== pageSize) return songs;
-      offset += rows.length;
-    }
-  }
+async function loadAllSongs(url){
+ const songs=[],pageSize=500;let offset=0;
+ while(true){
+  const target=new URL(url,location.href);target.searchParams.set("limit",String(pageSize));target.searchParams.set("offset",String(offset));
+  const response=await fetch(target.toString());if(!response.ok)throw new Error("Songs API "+response.status);
+  const payload=await response.json(),rows=Array.isArray(payload)?payload:payload.data;if(!Array.isArray(rows))throw new Error("Invalid songs response");
+  songs.push(...rows);const next=response.headers.get("X-Songs-Next-Offset");
+  if(next!==null){const n=Number(next);if(!Number.isSafeInteger(n)||n!==offset+rows.length||!rows.length)throw new Error("Invalid songs pagination");offset=n}
+  else{if(response.headers.get("X-Songs-Page-Limit")!==null||rows.length!==pageSize)return songs;offset+=rows.length}
+ }
 }
-// MADINENI SONG PAGINATION END
-
 const SONGS_API = `${API_BASE}/api/songs`;
 const audio = new Audio();
 audio.preload = "auto";
@@ -473,22 +484,17 @@ function render(){
   const heroAlbums=uniqueAlbums().slice(0,4).map(([a])=>a);
   $("heroDescription").textContent=heroAlbums.length ? heroAlbums.join(" • ")+" and more" : "Your music library";
   $("quick").innerHTML=data.slice(0,10).map((s,i)=>row(s,i)).join("");
-  $("trending").innerHTML=data.slice(10,22).map((s,i)=>row(s,i)).join("");
+  if(chartItems.length)renderChartRows();
   const albums=uniqueAlbums().slice(0,18);
   ["listen","albums","newalbums"].forEach(id=>$(id).innerHTML=albums.slice(0,12).map(([a,s])=>card(a,`${safeArtist(s)} • Album`,s)).join(""));
   $("artists").innerHTML=uniqueArtists().slice(0,12).map(([a,s])=>card(a,"Artist",s,true).replace('data-album=','data-artist=')).join("");
   $("genres").innerHTML=["Telugu Hits","Romance","Chill","Workout","Party","Devotional"].map(x=>card(x,"Mood & genre")).join("");
   renderPlaylistCards();
-  const hasSupermix=savedMixes.some(m=>m.name==="Telugu Supermix");
-  $("heroSave").textContent=hasSupermix?"✓ Saved":"＋ Save";
-  $("heroSave").setAttribute("aria-pressed",String(hasSupermix));
+  const hasMix=savedMixes.some(m=>m.name==="Telugu Hits");$("heroSave").textContent=hasMix?"✓ Saved":"＋ Save mix";$("heroSave").setAttribute("aria-pressed",String(hasMix));
   bindSongs();
 }
 function bindSongs(){document.querySelectorAll("[data-id]").forEach(el=>el.onclick=()=>{const i=data.findIndex(s=>String(s.id)===el.dataset.id);if(i>=0)select(i,true)})}
-function renderPlaylistCards(){
-  const saved=savedMixes.map(m=>`<button class="card" data-mix="${esc(m.name)}"><div class="art">♫</div><b>${esc(m.name)}</b><small>Saved mix • ${m.ids.length} songs</small></button>`).join("");
-  $("playlists").innerHTML=saved || '<p class="emptyState">No saved mixes yet. Save Telugu Supermix from Home.</p>';
-}
+function renderPlaylistCards(){const html=savedMixes.map(m=>`<button class="card" data-mix="${esc(m.name)}"><div class="art">♫</div><b>${esc(m.name)}</b><small>Saved mix • ${m.ids.length} songs</small></button>`).join("");$("playlists").innerHTML=html||'<p class="emptyState">No saved mixes yet. Save the Telugu Hits mix from Home.</p>'}
 function setArt(el,s,fallback="♫"){
   const html=artHTML(s,fallback);
   if(el._lastArtHTML===html)return;
@@ -592,8 +598,7 @@ audio.addEventListener("play",()=>{playing=true;sync()});audio.addEventListener(
 
 function openAlbum(name){const songs=data.filter(s=>safeAlbum(s)===name);if(!songs.length)return;$("albumTitle").textContent=name;setArt($("albumArt"),songs[0],name.slice(0,2).toUpperCase());$("albumMeta").textContent=`${songs.length} song${songs.length===1?"":"s"} • ${safeArtist(songs[0])}`;$("albumSongs").innerHTML=songs.map((s,i)=>row(s,i,true)).join("");const saved=savedAlbums.has(name);$("albumSave").textContent=saved?"✓ In Library":"＋ Library";$("albumSave").setAttribute("aria-pressed",String(saved));bindSongs();page("album")}
 document.addEventListener("click",e=>{
-  const mix=e.target.closest("[data-mix]");
-  if(mix){const saved=savedMixes.find(m=>m.name===mix.dataset.mix);const ids=new Set(saved?.ids||[]);const songs=data.filter(s=>ids.has(String(s.id)));if(songs.length){buildQueue(songs,songs[0].id,saved.name);select(data.findIndex(s=>String(s.id)===String(songs[0].id)),true,true)}return}
+  const mix=e.target.closest("[data-mix]");if(mix){const saved=savedMixes.find(m=>m.name===mix.dataset.mix);const ids=new Set(saved?.ids||[]);const songs=data.filter(s=>ids.has(String(s.id)));if(songs.length){buildQueue(songs,songs[0].id,saved.name);select(data.findIndex(s=>String(s.id)===String(songs[0].id)),true,true)}return}
   const albumCard=e.target.closest("[data-album]");
   if(albumCard && uniqueAlbums().some(([a])=>a===albumCard.dataset.album)){
     openAlbum(albumCard.dataset.album);
@@ -613,10 +618,7 @@ document.addEventListener("click",e=>{
     page("searchPage");
   }
 });
-$("back").onclick=()=>page(previousPage||"home");$("heroPlay").onclick=()=>select(0,true);$("quickPlayAll").onclick=()=>{if(!data.length)return;const songs=data.slice(0,10);buildQueue(songs,songs[0].id,"Quick picks");select(data.findIndex(s=>String(s.id)===String(songs[0].id)),true,true)};
-$("heroSave").onclick=()=>{if(!data.length)return;const name="Telugu Supermix";const i=savedMixes.findIndex(m=>m.name===name);if(i>=0){savedMixes.splice(i,1)}else{savedMixes.push({name,ids:data.map(s=>String(s.id))})}try{localStorage.setItem("madineniSavedMixes",JSON.stringify(savedMixes))}catch(e){console.error("Could not save mix",e)}const saved=savedMixes.some(m=>m.name===name);$("heroSave").textContent=saved?"✓ Saved":"＋ Save";$("heroSave").setAttribute("aria-pressed",String(saved));if($("library").classList.contains("active"))renderLibrary("playlists")};
-$("albumSave").onclick=()=>{const name=$("albumTitle").textContent;if(savedAlbums.has(name))savedAlbums.delete(name);else savedAlbums.add(name);try{localStorage.setItem("madineniSavedAlbums",JSON.stringify([...savedAlbums]))}catch(e){console.error("Could not save album",e)}openAlbum(name)};
-$("albumPlay").onclick=()=>{
+$("back").onclick=()=>page(previousPage||"home");$("heroPlay").onclick=()=>select(0,true);$("heroSave").onclick=()=>{if(!data.length)return;const name="Telugu Hits",i=savedMixes.findIndex(m=>m.name===name);if(i>=0)savedMixes.splice(i,1);else savedMixes.push({name,ids:data.map(s=>String(s.id))});try{localStorage.setItem("madineniSavedMixes",JSON.stringify(savedMixes))}catch(e){console.error("Could not save mix",e)}const saved=savedMixes.some(m=>m.name===name);$("heroSave").textContent=saved?"✓ Saved":"＋ Save mix";$("heroSave").setAttribute("aria-pressed",String(saved));if($("library").classList.contains("active"))renderLibrary("playlists")};$("albumSave").onclick=()=>{const name=$("albumTitle").textContent;if(savedAlbums.has(name))savedAlbums.delete(name);else savedAlbums.add(name);try{localStorage.setItem("madineniSavedAlbums",JSON.stringify([...savedAlbums]))}catch(e){console.error("Could not save album",e)}openAlbum(name)};$("albumPlay").onclick=()=>{
   const albumName=$("albumTitle").textContent;
   const songs=data.filter(s=>safeAlbum(s)===albumName);
 
@@ -706,7 +708,7 @@ function toggleFavorite(){
   if(favorites.has(id)) favorites.delete(id);
   else favorites.add(id);
 
-  localStorage.setItem("madineniFavorites",JSON.stringify([...favorites]));
+  try{localStorage.setItem("madineniFavorites",JSON.stringify([...favorites]))}catch(e){console.error("Could not save favorite",e)}
   updateHeart();
 }
 
@@ -746,7 +748,7 @@ function search(q){
   page("searchPage");
 }
 $("globalSearch").onkeydown=e=>{if(e.key==="Enter")search(e.target.value)};$("mobileSearch").onclick=()=>{const q=prompt("Search songs, albums or artists");if(q!==null){$("globalSearch").value=q;search(q)}};
-document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{
+document.querySelectorAll(".chip:not(.home-chip)").forEach(c=>c.onclick=()=>{
   c.parentElement.querySelectorAll(".chip").forEach(x=>x.classList.remove("active"));
   c.classList.add("active");
 });
@@ -788,6 +790,58 @@ document.querySelectorAll("[data-library]").forEach(b=>{
 });
 
 
+
+const chartUrl="https://rss.marketingtools.apple.com/api/v2/in/music/most-played/100/songs.json";
+let chartItems=[];
+function chartKey(value){return String(value||"").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/[^a-z0-9]/g,"")}
+function localChartMatch(item){
+ const title=chartKey(item.name),artist=chartKey(item.artistName);
+ if(!title||!artist)return null;
+ return data.find(song=>chartKey(song.title)===title&&chartKey(safeArtist(song))===artist)||null;
+}
+function chartRow(item,index){
+ const art=String(item.artwork?.url||"").replace("{w}","120").replace("{h}","120"),match=localChartMatch(item),action=match?"▶":"↗";
+ return '<div class="chart-row"><span class="chart-rank">'+(index+1)+'</span><div class="chart-art">'+(art?'<img src="'+esc(art)+'" alt="">':'♫')+'</div><div class="chart-copy"><b>'+esc(item.name||"Unknown song")+'</b><small>'+esc(item.artistName||"Unknown artist")+'</small></div><button onclick="playChart('+index+')" aria-label="'+(match?"Play":"Open Apple Music")+'">'+action+'</button></div>';
+}
+function renderChartRows(){
+ const home=$("homeTrending"),explore=$("trending");if(!chartItems.length)return;
+ const rows=chartItems.slice(0,20).map((item,index)=>chartRow(item,index));
+ if(home)home.innerHTML=rows.slice(0,4).join("");
+ if(explore)explore.innerHTML=rows.join("");
+}
+async function loadTrending(force=false){
+ const home=$("homeTrending"),explore=$("trending");
+ if(chartItems.length&&!force){renderChartRows();return}
+ const loading='<div class="chart-status">Loading current chart…</div>';
+ if(home)home.innerHTML=loading;if(explore)explore.innerHTML=loading;
+ try{
+  const response=await fetch(chartUrl,{cache:force?"reload":"default"});
+  if(!response.ok)throw new Error("Chart unavailable");
+  const payload=await response.json();chartItems=payload?.feed?.results||[];
+  if(!chartItems.length)throw new Error("Chart returned no songs");
+  renderChartRows();
+ }catch(error){
+  const message='<div class="chart-status">Could not load the chart. <button onclick="loadTrending(true)">Try again</button></div>';
+  if(home)home.innerHTML=message;if(explore)explore.innerHTML=message;
+  console.warn("Could not load current Apple Music chart",error);
+ }
+}
+function playChart(index){
+ const item=chartItems[index];if(!item)return;const match=localChartMatch(item);
+ if(match){select(data.indexOf(match),true);return}
+ try{const url=new URL(item.url);if(url.protocol==="https:"&&url.hostname==="music.apple.com")window.open(url.href,"_blank","noopener")}
+ catch(error){console.warn("Invalid chart URL",error)}
+}
+function playHomeQueue(){if(!data.length)return;buildQueue(data.slice(0,10),data[0].id,"Quick picks");select(0,true,true)}
+function openTrending(){page("explore");$("trendingSection").scrollIntoView({behavior:"smooth",block:"start"})}
+function browseHome(button){
+ document.querySelectorAll(".home-chip").forEach(chip=>chip.classList.remove("active"));button.classList.add("active");
+ const destination=button.dataset.browse;
+ if(destination==="trending"){openTrending();return}
+ if(destination==="moods"){page("explore");$("genres").scrollIntoView({behavior:"smooth",block:"start"});return}
+ page("home");const target=destination==="albums"?"albums":destination==="artists"?"artists":"home";$(target).scrollIntoView({behavior:"smooth",block:"start"});
+}
+
 async function init(){
   $("quick").innerHTML='<p class="status">Loading your music library…</p>';
   try{data=await loadAllSongs(SONGS_API);if(!Array.isArray(data)||!data.length)throw new Error("No songs returned");render();
@@ -798,6 +852,8 @@ await select(0,false);}
   catch(e){console.error(e);$("quick").innerHTML=`<p class="status error">Could not load songs from ${esc(SONGS_API)}. ${esc(e.message)}</p>`}
 }
 init();
+loadTrending();
+document.querySelectorAll(".home-chip").forEach(button=>button.addEventListener("click",()=>browseHome(button)));
 </script>
 <!-- MADINENI LYRICS START -->
 <script data-madineni-lyrics-loader="1">
