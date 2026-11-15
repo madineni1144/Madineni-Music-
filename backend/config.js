@@ -37,9 +37,22 @@ function loadConfig(env = process.env) {
     writeTokenTooShort: token.length > 0 && token.length < MIN_WRITE_TOKEN_LENGTH,
     // Writes must arrive over HTTPS unless explicitly relaxed (LAN/dev only).
     requireHttps: env.MUSICAPP_REQUIRE_HTTPS !== "false",
-    // Express "trust proxy" value so req.secure honours X-Forwarded-Proto
-    // from the local Cloudflare tunnel. Set to "false" to disable.
-    trustProxy: env.MUSICAPP_TRUST_PROXY || "loopback",
+    // How HTTPS is proven behind a proxy: "none" (default) or "cloudflare".
+    // See backend/proxy.js and README. Unknown values fall back to "none".
+    proxyMode: env.MUSICAPP_PROXY_MODE === "cloudflare" ? "cloudflare" : "none",
+    // Peers allowed to supply forwarded headers: "loopback" and/or exact IPs.
+    trustedProxies: (env.MUSICAPP_TRUSTED_PROXIES || "loopback")
+      .split(",").map((p) => p.trim()).filter(Boolean),
+
+    // Failed-auth lockout: per client, and a global ceiling.
+    authFailMax: positiveInt(env.MUSICAPP_AUTH_FAIL_MAX, 10),
+    authFailWindowMs: positiveInt(env.MUSICAPP_AUTH_FAIL_WINDOW_SEC, 900) * 1000,
+    authFailGlobalMax: positiveInt(env.MUSICAPP_AUTH_FAIL_GLOBAL_MAX, 200),
+
+    // Explicit lyrics refresh (?refresh=1) budgets.
+    refreshSongCooldownMs: positiveInt(env.MUSICAPP_REFRESH_SONG_COOLDOWN_SEC, 300) * 1000,
+    refreshPerClientHour: positiveInt(env.MUSICAPP_REFRESH_PER_CLIENT_HOUR, 20),
+    refreshOverallHour: positiveInt(env.MUSICAPP_REFRESH_OVERALL_HOUR, 60),
 
     // Empty list => no cross-origin access (same-origin only).
     corsOrigins: (env.CORS_ORIGINS || "")

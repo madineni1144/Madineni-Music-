@@ -100,6 +100,27 @@
       }
       return {ok:false, message:'The write token was rejected too many times.'};
     }
+    // Explicit refresh (?refresh=1) needs the write token; plain reads never do.
+    async function refreshHeaders() {
+      if (!canSendToken()) return {error: 'Refreshing lyrics requires HTTPS. Open the app over https:// to continue.'};
+      if (!writeToken) {
+        const entered = await askForToken('Enter the write token to search for lyrics again. It is kept in memory only.');
+        if (!entered) return {error: 'Search cancelled: no token entered.'};
+        writeToken = entered;
+      }
+      return {headers: {'Authorization': `Bearer ${writeToken}`}};
+    }
+    async function refreshProblem(response) {
+      const body = await response.json().catch(() => ({}));
+      if (response.status === 401) { writeToken = ''; return 'The write token was not accepted. Try again with the correct token.'; }
+      if (response.status === 429) {
+        const seconds = Number(response.headers.get('Retry-After')) || 60;
+        return `Too many attempts. Try again in about ${Math.ceil(seconds / 60)} minute(s).`;
+      }
+      if (response.status === 403 && body.code === 'HTTPS_REQUIRED') return 'The server requires HTTPS for this action.';
+      if (response.status === 503 && body.code === 'WRITE_AUTH_UNAVAILABLE') return 'Searching again is disabled: the server has no write token configured.';
+      return null;
+    }
     const visible = () => active && !!host && !!host.querySelector('.mm-lyrics-view') && (!dialog || dialog.open);
     function stop() {
       active = false; generation++; request?.abort(); clearTimeout(retryTimer);
@@ -147,7 +168,23 @@
       const timeout = setTimeout(() => controller.abort(), 45000);
       try {
         const url = `${base}/api/songs/${encodeURIComponent(activeId)}/lyrics${opts.refresh ? '?refresh=1' : ''}`;
-        const response = await fetch(url, {signal:controller.signal,cache:'no-store'});
+        let requestHeaders;
+        if (opts.refresh) {
+          const auth = await refreshHeaders();
+          if (auth.error) {body.replaceChildren(el('p', auth.error));return;}
+          requestHeaders = auth.headers;
+        }
+        const response = await fetch(url, {signal:controller.signal,cache:'no-store',headers:requestHeaders});
+        if (opts.refresh && [401,403,429,503].includes(response.status)) {
+          const problem = await refreshProblem(response.clone());
+          if (problem) {
+            body.replaceChildren(el('p', problem));
+            const back = el('button', 'Show saved result', 'mm-lyrics-retry');
+            back.type = 'button'; back.onclick = () => load();
+            body.append(back);
+            return;
+          }
+        }
         if (!response.ok) {
           const seconds = Number(response.headers.get('Retry-After')) || 5;
           const error = new Error('Lyrics are temporarily unavailable.');
@@ -182,7 +219,7 @@
             addBtn.disabled = true; statusLine.textContent = 'Saving lyrics…';
             const outcome = await saveLyrics(activeId, payload);
             addBtn.disabled = false;
-            if (outcome.ok) load({ refresh: true });
+            if (outcome.ok) load();
             else statusLine.textContent = outcome.message;
           };
           actionsBox.append(addBtn, statusLine);

@@ -246,7 +246,11 @@ function mount(app,pool,options={}) {
       res.set('Cache-Control','no-store').json({success:true,version:VERSION,provider:'LRCLIB',storage:'PostgreSQL',counts:Object.fromEntries(results.rows.map(x=>[x.status,x.count]))});
     }catch {res.status(503).json({success:false,error:'Lyrics database unavailable'});}
   });
-  app.get('/api/songs/:id/lyrics',async(req,res)=>{
+  // Plain reads stay open. An explicit refresh bypasses the cache (provider lookup + DB write),
+  // so it must pass the refresh guard; it fails closed when none is supplied.
+  const wantsRefresh=req=>req.query.refresh==='1'||req.query.refresh==='true';
+  const refreshGuard=options.refreshGuard||denyWrites;
+  app.get('/api/songs/:id/lyrics',(req,res,next)=>wantsRefresh(req)?refreshGuard(req,res,next):next(),async(req,res)=>{
     const id=String(req.params.id);
     if(!/^[1-9]\d{0,18}$/.test(id) || BigInt(id)>9223372036854775807n)return res.status(400).json({success:false,error:'Invalid song ID'});
     const refresh = req.query.refresh === '1' || req.query.refresh === 'true';

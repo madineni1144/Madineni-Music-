@@ -5,12 +5,16 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --no-warnings --test \"test/*.test.js\"",
+    "test:blocked": "MUSICAPP_ALLOW_BLOCKED_ROUTE_TESTS=1 node --no-warnings --test \"test/*.test.js\""
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "pg": "^8.13.1"
+  },
+  "engines": {
+    "node": ">=22.13"
   }
 }

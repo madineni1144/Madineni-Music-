@@ -39,3 +39,18 @@ test("the lyrics module fails closed when no guard is supplied", () => {
 test("no code path reads the retired ADMIN_TOKEN name", () => {
   for (const [name, source] of files) assert.equal(/ADMIN_TOKEN/.test(source), false, name);
 });
+
+test("explicit lyrics refresh is guarded and fails closed when no guard is supplied", () => {
+  const lyrics = files.find(([n]) => n === "madineni-lyrics.cjs")[1];
+  assert.match(lyrics, /options\.refreshGuard\|\|denyWrites/);
+  assert.match(lyrics, /wantsRefresh\(req\)\?refreshGuard\(req,res,next\):next\(\)/);
+  const server = files.find(([n]) => n === "server.js")[1];
+  assert.match(server, /refreshGuard\s*=\s*chain\(\s*writeGuard,\s*refreshThrottle/);
+  assert.match(server, /mount\(app, pool,[^)]*refreshGuard/);
+});
+
+test("Express trust-proxy is never enabled (forwarded headers only via proxy.js)", () => {
+  const server = files.find(([n]) => n === "server.js")[1];
+  assert.equal(/app\.set\(\s*["']trust proxy["']/.test(server), false);
+  assert.equal(/req\.secure|req\.protocol|req\.ip\b/.test(server), false);
+});

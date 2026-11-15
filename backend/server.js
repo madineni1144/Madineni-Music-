@@ -3,12 +3,16 @@ const cors = require("cors");
 const path = require("path");
 const { loadConfig } = require("./config");
 const {
-  escapeLike,
   parsePagination,
   requireWriteAuth,
+  refreshThrottle,
+  chain,
   buildCorsOptions,
   jsonErrorHandler
 } = require("./http-utils");
+const { buildSongsQuery } = require("./songs-query");
+const { createProxyTrust } = require("./proxy");
+const { createRateLimiter } = require("./rate-limit");
 const { deletePlaylist } = require("./playlist-store");
 
 /**
@@ -20,10 +24,11 @@ function createApp({ pool, config, lyricsOptions = {} }) {
 const app = express();
 app.disable("x-powered-by");
 
-// Lets req.secure honour X-Forwarded-Proto from the local Cloudflare tunnel.
-if (config.trustProxy && config.trustProxy !== "false") {
-  app.set("trust proxy", config.trustProxy);
-}
+// Forwarded headers are never trusted via Express "trust proxy"; see proxy.js.
+const proxy = createProxyTrust({
+  mode: config.proxyMode,
+  trustedProxies: config.trustedProxies
+});
 
 const FRONTEND_DIR = config.frontendDir;
 const MUSIC_DIR = config.musicDir;
@@ -34,8 +39,29 @@ const EXPOSE_ERROR_DETAILS = config.exposeErrorDetails;
 const writeGuard = requireWriteAuth({
   token: config.writeToken,
   configured: config.writeAuthConfigured,
-  requireHttps: config.requireHttps
+  requireHttps: config.requireHttps,
+  isSecure: proxy.isSecure,
+  clientIp: proxy.clientIp,
+  failLimiter: createRateLimiter({ windowMs: config.authFailWindowMs, max: config.authFailMax }),
+  globalFailLimiter: createRateLimiter({
+    windowMs: config.authFailWindowMs,
+    max: config.authFailGlobalMax,
+    maxKeys: 1
+  })
 });
+
+// Explicit lyrics refresh (?refresh=1) costs a provider lookup and a database
+// write: it needs the write token and is throttled per song, client and overall.
+const hour = 60 * 60 * 1000;
+const refreshGuard = chain(
+  writeGuard,
+  refreshThrottle({
+    perSong: createRateLimiter({ windowMs: config.refreshSongCooldownMs, max: 1 }),
+    perClient: createRateLimiter({ windowMs: hour, max: config.refreshPerClientHour }),
+    overall: createRateLimiter({ windowMs: hour, max: config.refreshOverallHour, maxKeys: 1 }),
+    clientIp: proxy.clientIp
+  })
+);
 
 // Only configured origins receive CORS headers. CORS is not authentication.
 app.use(cors(buildCorsOptions(config.corsOrigins)));
@@ -50,7 +76,7 @@ ROOT
 ========================= */
 
 // MADINENI LYRICS START
-require("./madineni-lyrics.cjs").mount(app, pool, {musicDir:MUSIC_DIR, ...lyricsOptions, writeGuard});
+require("./madineni-lyrics.cjs").mount(app, pool, {musicDir:MUSIC_DIR, ...lyricsOptions, writeGuard, refreshGuard});
 // MADINENI LYRICS END
 
 
@@ -136,116 +162,10 @@ const { limit, offset } =
     maxSize: config.maxPageSize
   });
 
-const conditions = [];
-const values = [];
-
-let parameter = 1;
-
-
-if (search !== "") {
-
-  conditions.push(
-    "(" +
-    "songs.title ILIKE $" +
-    parameter +
-    " OR artists.name ILIKE $" +
-    parameter +
-    " OR albums.title ILIKE $" +
-    parameter +
-    ")"
-  );
-
-  values.push(
-    "%" + escapeLike(search) + "%"
-  );
-
-  parameter++;
-
-}
-
-
-if (artist !== "") {
-
-  conditions.push(
-    "artists.name ILIKE $" +
-    parameter
-  );
-
-  values.push(
-    "%" + escapeLike(artist) + "%"
-  );
-
-  parameter++;
-
-}
-
-
-if (album !== "") {
-
-  conditions.push(
-    "albums.title ILIKE $" +
-    parameter
-  );
-
-  values.push(
-    "%" + escapeLike(album) + "%"
-  );
-
-  parameter++;
-
-}
-
-
-const whereClause =
-  conditions.length > 0
-    ? "WHERE " +
-      conditions.join(" AND ")
-    : "";
-
-
-values.push(limit);
-const limitParameter = parameter;
-parameter++;
-
-values.push(offset);
-const offsetParameter = parameter;
-
+const query = buildSongsQuery({ search, artist, album, limit, offset });
 
 const result =
-  await pool.query(
-    `
-    SELECT
-      songs.id,
-      songs.title,
-      songs.artist_id,
-      artists.name AS artist,
-      songs.album_id,
-      albums.title AS album,
-      songs.track_number,
-      songs.duration_seconds,
-      songs.file_path,
-      songs.file_format,
-      songs.file_size,
-      songs.created_at,
-      COALESCE(NULLIF(albums.cover_path, ''), '/covers/' || songs.id || '.jpg') AS cover_art
-
-    FROM songs
-
-    LEFT JOIN artists
-      ON songs.artist_id = artists.id
-
-    LEFT JOIN albums
-      ON songs.album_id = albums.id
-
-    ${whereClause}
-
-    ORDER BY songs.id ASC
-
-    LIMIT $${limitParameter}
-    OFFSET $${offsetParameter}
-    `,
-    values
-  );
+  await pool.query(query.text, query.values);
 
 res.json(result.rows);
 
