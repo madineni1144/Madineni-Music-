@@ -14,11 +14,18 @@ Personal music app with an Ubuntu-hosted API, PostgreSQL catalog, web frontend, 
 ### Backend setup and tests
 1. `cd backend && npm install`
 2. Copy `.env.example` to `/opt/musicapp/app/config/.env` (or point `ENV_FILE` at it) and fill in the database settings.
-3. `npm start` serves the API on `PORT` (default 3000). `npm test` runs the unit tests (no database required).
+3. `npm start` serves the API on `PORT` (default 3000). `npm test` runs the test suite (no database needed; route tests need the npm dependencies and are reported as skipped without them).
 
-**Write protection:** set `ADMIN_TOKEN` to require `Authorization: Bearer <token>` on playlist writes and manual lyrics saves. While it is empty, those endpoints remain open, as before. The built-in "Add / Paste Lyrics" button does not send a token yet, so enabling the token disables that button until the client is updated.
+**Write authentication (fail-closed).** Playlist writes and manual lyrics saves require `Authorization: Bearer <token>`, where the token is `MUSICAPP_WRITE_TOKEN` (at least 32 characters; `openssl rand -hex 32`). If it is missing or too short, those routes return `503 WRITE_AUTH_UNAVAILABLE` and nothing is writable; reads and playback are unaffected. Writes are refused over plain HTTP (`403 HTTPS_REQUIRED`) unless `MUSICAPP_REQUIRE_HTTPS=false`. There is no token in the frontend: the lyrics editor asks an authorized user to type it, keeps it in memory only, and discards it on reload or when the server rejects it. The earlier unreleased `ADMIN_TOKEN` name was never deployed and is not read.
 
-**Safe defaults:** the Airflow DAG is created paused and the pipeline must stay paused until explicitly authorized; the API makes no artwork lookups.
+**CORS.** Only origins listed in `CORS_ORIGINS` get cross-origin access; leave it empty for same-origin use. CORS does not replace authentication.
+
+**Song pagination.** `GET /api/songs` returns at most `MUSICAPP_MAX_PAGE_SIZE` rows (default 500; default page 100) ordered by id. Clients request `?limit=&offset=` pages until an empty page. Any other caller that relied on getting the whole library in one response must page the same way.
+
+**Diagnostics.** `GET /api/health` returns only `{success, status}`; `/api/db-test` returns only `{connected}`.
+
+### Pipeline settings
+Defaults are unchanged; override with `MUSICAPP_MUSIC_ROOT`, `MUSICAPP_STAGING_DIR`, `MUSICAPP_REPORT_DIR`, `MUSICAPP_DB_ENV_FILE`, `MUSICAPP_EMAIL_ENV`, `GOOGLE_DRIVE_TOKEN_FILE`, `GOOGLE_OAUTH_CLIENT_FILE`. The Airflow DAG is created paused and must stay paused until explicitly authorized; no artwork lookups are made. Tests: `PYTHONPATH=. python3 -m unittest discover -s audio_pipeline/tests`.
 
 ## iOS App
 `ios/` — reserved for the Xcode app; upload its source separately.
