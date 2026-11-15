@@ -4,7 +4,7 @@ import psycopg2
 from dotenv import load_dotenv
 
 
-ENV_FILE = "/etc/musicapp.env"
+ENV_FILE = os.getenv("MUSICAPP_DB_ENV_FILE", "/etc/musicapp.env")
 
 
 def get_connection():

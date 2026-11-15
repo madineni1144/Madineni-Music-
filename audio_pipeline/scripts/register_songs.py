@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import argparse
 import hashlib
@@ -8,7 +9,9 @@ from audio_pipeline.scripts.db import (
     mark_import_item_failed,
 )
 
-MUSIC_ROOT = Path("/opt/musicapp/music/Songs").resolve()
+MUSIC_ROOT = Path(
+    os.getenv("MUSICAPP_MUSIC_ROOT", "/opt/musicapp/music/Songs")
+).resolve()
 
 
 def parse_arguments():

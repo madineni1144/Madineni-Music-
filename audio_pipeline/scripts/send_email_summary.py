@@ -17,7 +17,9 @@ EMAIL_ENV = Path(
     )
 )
 
-REPORT_DIR = Path("/opt/musicapp/reports")
+REPORT_DIR = Path(
+    os.getenv("MUSICAPP_REPORT_DIR", "/opt/musicapp/reports")
+)
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465
 
