@@ -2,17 +2,40 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const { Pool } = require("pg");
-require("dotenv").config({ path: "/opt/musicapp/app/config/.env" });
+const {
+  escapeLike,
+  requireWriteAuth,
+  jsonErrorHandler
+} = require("./http-utils");
+
+// Defaults match the existing Ubuntu deployment; override via environment.
+require("dotenv").config({
+  path: process.env.ENV_FILE || "/opt/musicapp/app/config/.env"
+});
 
 const app = express();
+app.disable("x-powered-by");
 
-const PORT = 3000;
-const FRONTEND_DIR = "/opt/musicapp/app/frontend";
-const MUSIC_DIR = "/opt/musicapp/music/Songs";
-const COVERS_DIR = "/opt/musicapp/covers";
+const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
+const FRONTEND_DIR = process.env.FRONTEND_DIR || "/opt/musicapp/app/frontend";
+const MUSIC_DIR = process.env.MUSIC_DIR || "/opt/musicapp/music/Songs";
+const COVERS_DIR = process.env.COVERS_DIR || "/opt/musicapp/covers";
 
-app.use(cors());
-app.use(express.json());
+// Error text is only returned to clients when explicitly enabled (development).
+const EXPOSE_ERROR_DETAILS = process.env.EXPOSE_ERROR_DETAILS === "true";
+
+// Optional shared secret protecting write endpoints (see .env.example).
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
+const writeGuard = requireWriteAuth(ADMIN_TOKEN);
+
+// CORS: comma-separated allow-list; unset keeps the existing open behaviour.
+const corsOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
+app.use(express.json({ limit: "512kb" }));
 
 app.use(express.static(FRONTEND_DIR));
 app.use("/music", express.static(MUSIC_DIR));
@@ -34,7 +57,7 @@ ROOT
 ========================= */
 
 // MADINENI LYRICS START
-require("./madineni-lyrics.cjs").mount(app, pool, {musicDir:MUSIC_DIR});
+require("./madineni-lyrics.cjs").mount(app, pool, {musicDir:MUSIC_DIR, writeGuard});
 // MADINENI LYRICS END
 
 
@@ -73,7 +96,7 @@ res.status(503).json({
   success: false,
   status: "error",
   database: "disconnected",
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -108,7 +131,7 @@ console.error(
 
 res.status(500).json({
   connected: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -188,7 +211,7 @@ if (search !== "") {
   );
 
   values.push(
-    "%" + search + "%"
+    "%" + escapeLike(search) + "%"
   );
 
   parameter++;
@@ -204,7 +227,7 @@ if (artist !== "") {
   );
 
   values.push(
-    "%" + artist + "%"
+    "%" + escapeLike(artist) + "%"
   );
 
   parameter++;
@@ -220,7 +243,7 @@ if (album !== "") {
   );
 
   values.push(
-    "%" + album + "%"
+    "%" + escapeLike(album) + "%"
   );
 
   parameter++;
@@ -290,7 +313,7 @@ console.error(
 
 res.status(500).json({
   error: "Unable to load songs",
-  details: error.message
+  details: EXPOSE_ERROR_DETAILS ? error.message : undefined
 });
 
 }
@@ -319,7 +342,7 @@ res.json({
 
 res.status(500).json({
   success: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -402,7 +425,7 @@ console.error(
 
 res.status(500).json({
   success: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -450,7 +473,7 @@ console.error(
 
 res.status(500).json({
   success: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -512,7 +535,7 @@ console.error(
 
 res.status(500).json({
   success: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -557,7 +580,7 @@ console.error(
 
 res.status(500).json({
   success: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -613,7 +636,7 @@ console.error(
 res.status(500).json({
   success: false,
   error: "Unable to load playlists",
-  details: error.message
+  details: EXPOSE_ERROR_DETAILS ? error.message : undefined
 });
 
 }
@@ -624,7 +647,7 @@ res.status(500).json({
 CREATE PLAYLIST
 ========================= */
 
-app.post("/api/playlists", async (req, res) => {
+app.post("/api/playlists", writeGuard, async (req, res) => {
 
 try {
 
@@ -680,7 +703,7 @@ console.error(
 res.status(500).json({
   success: false,
   error: "Unable to create playlist",
-  details: error.message
+  details: EXPOSE_ERROR_DETAILS ? error.message : undefined
 });
 
 }
@@ -757,7 +780,7 @@ try {
   res.status(500).json({
     success: false,
     error: "Unable to load playlist songs",
-    details: error.message
+    details: EXPOSE_ERROR_DETAILS ? error.message : undefined
   });
 
 }
@@ -771,6 +794,7 @@ ADD SONG TO PLAYLIST
 
 app.post(
 "/api/playlists/:id/songs",
+writeGuard,
 async (req, res) => {
 
 try {
@@ -835,7 +859,7 @@ try {
     success: false,
     error:
       "Unable to add song to playlist",
-    details: error.message
+    details: EXPOSE_ERROR_DETAILS ? error.message : undefined
   });
 
 }
@@ -849,6 +873,7 @@ REMOVE SONG FROM PLAYLIST
 
 app.delete(
 "/api/playlists/:id/songs/:songId",
+writeGuard,
 async (req, res) => {
 
 try {
@@ -910,7 +935,7 @@ try {
     success: false,
     error:
       "Unable to remove song from playlist",
-    details: error.message
+    details: EXPOSE_ERROR_DETAILS ? error.message : undefined
   });
 
 }
@@ -924,6 +949,7 @@ DELETE PLAYLIST
 
 app.delete(
 "/api/playlists/:id",
+writeGuard,
 async (req, res) => {
 
 try {
@@ -943,16 +969,24 @@ try {
 
   }
 
-  await pool.query(
-    `
-    DELETE FROM playlist_songs
-    WHERE playlist_id = $1
-    `,
-    [playlistId]
-  );
+  // Both deletes run in one transaction so a failure cannot leave a
+  // playlist with its songs removed but the playlist itself still present.
+  const client = await pool.connect();
+  let result;
 
-  const result =
-    await pool.query(
+  try {
+
+    await client.query("BEGIN");
+
+    await client.query(
+      `
+      DELETE FROM playlist_songs
+      WHERE playlist_id = $1
+      `,
+      [playlistId]
+    );
+
+    result = await client.query(
       `
       DELETE FROM playlists
       WHERE id = $1
@@ -963,6 +997,19 @@ try {
       `,
       [playlistId]
     );
+
+    await client.query("COMMIT");
+
+  } catch (transactionError) {
+
+    await client.query("ROLLBACK").catch(() => {});
+    throw transactionError;
+
+  } finally {
+
+    client.release();
+
+  }
 
   if (!result.rows.length) {
 
@@ -989,7 +1036,7 @@ try {
     success: false,
     error:
       "Unable to delete playlist",
-    details: error.message
+    details: EXPOSE_ERROR_DETAILS ? error.message : undefined
   });
 
 }
@@ -1010,6 +1057,8 @@ path: req.path
 });
 
 });
+
+app.use(jsonErrorHandler(EXPOSE_ERROR_DETAILS));
 
 /* =========================
 SERVER

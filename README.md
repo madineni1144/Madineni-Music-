@@ -11,6 +11,15 @@ Personal music app with an Ubuntu-hosted API, PostgreSQL catalog, web frontend, 
 ## Backend
 `backend/` — Node.js API and server code. The existing service runs on port 3000.
 
+### Backend setup and tests
+1. `cd backend && npm install`
+2. Copy `.env.example` to `/opt/musicapp/app/config/.env` (or point `ENV_FILE` at it) and fill in the database settings.
+3. `npm start` serves the API on `PORT` (default 3000). `npm test` runs the unit tests (no database required).
+
+**Write protection:** set `ADMIN_TOKEN` to require `Authorization: Bearer <token>` on playlist writes and manual lyrics saves. While it is empty, those endpoints remain open, as before. The built-in "Add / Paste Lyrics" button does not send a token yet, so enabling the token disables that button until the client is updated.
+
+**Safe defaults:** the Airflow DAG is created paused and the pipeline must stay paused until explicitly authorized; the API makes no artwork lookups.
+
 ## iOS App
 `ios/` — reserved for the Xcode app; upload its source separately.
 

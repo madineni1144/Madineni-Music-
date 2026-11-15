@@ -255,12 +255,13 @@ function mount(app,pool,options={}) {
       res.set('Retry-After',String(error.retrySeconds||5)).status(503).json({success:false,error:'Lyrics temporarily unavailable. Please try again later.'});
     }
   });
-  app.post('/api/songs/:id/lyrics',async(req,res)=>{
+  app.post('/api/songs/:id/lyrics',options.writeGuard||((req,res,next)=>next()),async(req,res)=>{
     const id=String(req.params.id);
     if(!/^[1-9]\d{0,18}$/.test(id))return res.status(400).json({success:false,error:'Invalid song ID'});
     const plain=typeof req.body?.plainLyrics==='string'?req.body.plainLyrics.trim():null;
     const synced=typeof req.body?.syncedLyrics==='string'?req.body.syncedLyrics.trim():null;
     if(!plain && !synced)return res.status(400).json({success:false,error:'Plain or synced lyrics text is required'});
+    if(Buffer.byteLength(plain||'')>MAX_LYRICS_BYTES||Buffer.byteLength(synced||'')>MAX_LYRICS_BYTES)return res.status(413).json({success:false,error:'Lyrics text is too large'});
     try {
       await service.ready;
       const found=await pool.query(SONG_SQL,[id]);
@@ -278,7 +279,8 @@ function mount(app,pool,options={}) {
         [id,fp,plain,synced]);
       res.json({success:true,data:core.recordPayload(id,saved.rows[0])});
     }catch(err){
-      res.status(500).json({success:false,error:err.message});
+      console.error('Manual lyrics save error:',err.message);
+      res.status(500).json({success:false,error:'Unable to save lyrics'});
     }
   });
   return service;
