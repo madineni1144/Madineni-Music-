@@ -108,6 +108,9 @@ const state={songs:[],albums:[],artists:[],playlists:[],favorites:JSON.parse(loc
 const nav=[['player','⌂','Home'],['songs','♫','Songs'],['albums','▦','Albums'],['artists','♙','Artists'],['favorites','♥','Favorites'],['playlists','☷','Playlists']];
 const API=window.MUSIC_API_BASE||'';
 function api(path){return fetch(API+path).then(r=>{if(!r.ok)throw Error(r.status);return r.json()})}
+// Songs are served in bounded pages; keep requesting until an empty page so no songs are silently dropped.
+async function apiAllSongs(){const size=500,all=[];for(let guard=0;guard<10000;guard++){const page=await api('/api/songs?limit='+size+'&offset='+all.length);const rows=Array.isArray(page)?page:(page.data||[]);if(!rows.length)return all;all.push(...rows)}throw Error('song list did not finish loading')}
+function showLoadWarning(msg){const n=document.createElement('div');n.setAttribute('role','alert');n.style.cssText='position:fixed;left:0;right:0;top:0;z-index:9999;padding:10px 14px;background:#7a1020;color:#fff;font:14px sans-serif';n.textContent=msg;document.body.append(n)}
 function openScreen(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));document.getElementById(id)?.classList.add('active');document.querySelectorAll('.nav button,.bottom button').forEach(b=>b.classList.toggle('active',b.dataset.screen===id))}
 function setupNav(){const html=nav.map(([id,icon,name])=>`<button data-screen="${id}" onclick="openScreen('${id}')"><span>${icon}</span>${name}</button>`).join('');document.getElementById('sideNav').innerHTML=html;document.getElementById('bottomNav').innerHTML=html}
 function img(src){return src?`<img src="${src}" alt="">`:''}
@@ -142,7 +145,7 @@ async function load(){
  const endpoints=[
    ['/api/songs','songs'],['/api/albums','albums'],['/api/artists','artists'],['/api/playlists','playlists']
  ];
- for(const [url,key] of endpoints){try{const r=await api(url);state[key]=Array.isArray(r)?r:(r.data||r[key]||[])}catch(e){console.warn('Could not load',url,e)}}
+ for(const [url,key] of endpoints){try{const r=key==='songs'?await apiAllSongs():await api(url);state[key]=Array.isArray(r)?r:(r.data||r[key]||[])}catch(e){console.warn('Could not load',url,e);if(key==='songs')showLoadWarning('Some songs could not be loaded ('+e.message+'). Reload to try again.')}}
  renderSongs();renderAlbums();renderArtists();renderFavorites();renderPlaylists();renderRecent();
 }
 load();

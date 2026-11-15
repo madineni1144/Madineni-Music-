@@ -826,9 +826,10 @@ function browseHome(button){
  page("home");const target=destination==="albums"?"albums":destination==="artists"?"artists":"home";$(target).scrollIntoView({behavior:"smooth",block:"start"});
 }
 
+async function fetchAllSongs(){const size=500,all=[];for(let guard=0;guard<10000;guard++){const r=await fetch(`${SONGS_API}?limit=${size}&offset=${all.length}`);if(!r.ok)throw new Error(`API ${r.status}`);const rows=await r.json();if(!Array.isArray(rows))throw new Error("Unexpected songs response");if(!rows.length)return all;all.push(...rows)}throw new Error("Song list did not finish loading")}
 async function init(){
   $("quick").innerHTML='<p class="status">Loading your music library…</p>';
-  try{const r=await fetch(SONGS_API);if(!r.ok)throw new Error(`API ${r.status}`);data=await r.json();if(!Array.isArray(data)||!data.length)throw new Error("No songs returned");render();
+  try{data=await fetchAllSongs();if(!Array.isArray(data)||!data.length)throw new Error("No songs returned");render();
   if(data.length && !playQueue.length){
     buildQueue(data,data[0].id,"Library");
   }

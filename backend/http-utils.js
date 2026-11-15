@@ -18,27 +18,57 @@ function safeEqual(a, b) {
 }
 
 /**
- * Express middleware guarding write endpoints.
- *
- * - token set      -> requests must send "Authorization: Bearer <token>".
- * - token not set  -> requests pass through (current behaviour), so existing
- *                     deployments keep working until a token is configured.
+ * Bounded pagination. Invalid, missing or oversized values fall back to the
+ * default / maximum instead of producing an unbounded query.
  */
-function requireWriteAuth(token) {
-  const configured = typeof token === "string" ? token.trim() : "";
+function parsePagination(query, { defaultSize = 100, maxSize = 500 } = {}) {
+  const rawLimit = Number.parseInt(query?.limit, 10);
+  const rawOffset = Number.parseInt(query?.offset, 10);
 
+  let limit = Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : defaultSize;
+  limit = Math.min(limit, maxSize);
+
+  const offset = Number.isInteger(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
+
+  return { limit, offset };
+}
+
+/**
+ * Write-route guard. Fail-closed:
+ *  - token missing/too short  -> 503 (writes disabled, nothing is open)
+ *  - HTTPS required but absent -> 403
+ *  - bad/missing bearer token -> 401
+ * Responses never contain the configured token.
+ */
+function requireWriteAuth({ token = "", configured = false, requireHttps = true } = {}) {
   return function writeGuard(req, res, next) {
-    if (!configured) {
-      return next();
+    if (!configured || !token) {
+      return res.status(503).json({
+        success: false,
+        code: "WRITE_AUTH_UNAVAILABLE",
+        error: "Write operations are disabled: server authentication is not configured"
+      });
     }
 
-    const header = req.get ? req.get("authorization") : req.headers?.authorization;
-    const match = /^Bearer\s+(.+)$/i.exec(header || "");
+    if (requireHttps && !req.secure) {
+      return res.status(403).json({
+        success: false,
+        code: "HTTPS_REQUIRED",
+        error: "Write operations require HTTPS"
+      });
+    }
 
-    if (!match || !safeEqual(match[1].trim(), configured)) {
+    const header = typeof req.get === "function"
+      ? req.get("authorization")
+      : req.headers?.authorization;
+    const match = /^Bearer\s+(\S+)$/i.exec(header || "");
+
+    if (!match || !safeEqual(match[1], token)) {
+      res.set?.("WWW-Authenticate", 'Bearer realm="musicapp-write"');
       return res.status(401).json({
         success: false,
-        error: "Authentication required"
+        code: "AUTH_REQUIRED",
+        error: "A valid write token is required"
       });
     }
 
@@ -47,8 +77,29 @@ function requireWriteAuth(token) {
 }
 
 /**
- * Build an error response body. Internal error text is only included
- * when explicitly allowed (development), never in production.
+ * CORS options: only configured origins get CORS headers. Requests without
+ * an Origin header (same-origin pages, curl) are unaffected. This does not
+ * replace authentication.
+ */
+function buildCorsOptions(origins = []) {
+  const allowed = new Set(origins);
+
+  return {
+    origin(origin, callback) {
+      if (!origin || allowed.has(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
+    methods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["X-Total-Count"],
+    maxAge: 600
+  };
+}
+
+/**
+ * Error response body. Internal error text is only included when allowed.
  */
 function errorBody(message, error, exposeDetails) {
   const body = { success: false, error: message };
@@ -85,7 +136,9 @@ function jsonErrorHandler(exposeDetails) {
 module.exports = {
   escapeLike,
   safeEqual,
+  parsePagination,
   requireWriteAuth,
+  buildCorsOptions,
   errorBody,
   jsonErrorHandler
 };

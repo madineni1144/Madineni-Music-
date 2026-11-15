@@ -233,6 +233,7 @@ function createService(pool,options={}) {
   }
   return {get,ready};
 }
+function denyWrites(req,res){return res.status(503).json({success:false,code:'WRITE_AUTH_UNAVAILABLE',error:'Write operations are disabled: server authentication is not configured'});}
 function mount(app,pool,options={}) {
   const service=createService(pool,options);
   app.get('/api/lyrics/player.js',(req,res)=>{
@@ -255,7 +256,7 @@ function mount(app,pool,options={}) {
       res.set('Retry-After',String(error.retrySeconds||5)).status(503).json({success:false,error:'Lyrics temporarily unavailable. Please try again later.'});
     }
   });
-  app.post('/api/songs/:id/lyrics',options.writeGuard||((req,res,next)=>next()),async(req,res)=>{
+  app.post('/api/songs/:id/lyrics',options.writeGuard||denyWrites,async(req,res)=>{
     const id=String(req.params.id);
     if(!/^[1-9]\d{0,18}$/.test(id))return res.status(400).json({success:false,error:'Invalid song ID'});
     const plain=typeof req.body?.plainLyrics==='string'?req.body.plainLyrics.trim():null;

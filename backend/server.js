@@ -1,63 +1,56 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const { Pool } = require("pg");
+const { loadConfig } = require("./config");
 const {
   escapeLike,
+  parsePagination,
   requireWriteAuth,
+  buildCorsOptions,
   jsonErrorHandler
 } = require("./http-utils");
+const { deletePlaylist } = require("./playlist-store");
 
-// Defaults match the existing Ubuntu deployment; override via environment.
-require("dotenv").config({
-  path: process.env.ENV_FILE || "/opt/musicapp/app/config/.env"
-});
+/**
+ * Build the Express app. The database pool and configuration are injected so
+ * the routes can be tested without a live database.
+ */
+function createApp({ pool, config, lyricsOptions = {} }) {
 
 const app = express();
 app.disable("x-powered-by");
 
-const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
-const FRONTEND_DIR = process.env.FRONTEND_DIR || "/opt/musicapp/app/frontend";
-const MUSIC_DIR = process.env.MUSIC_DIR || "/opt/musicapp/music/Songs";
-const COVERS_DIR = process.env.COVERS_DIR || "/opt/musicapp/covers";
+// Lets req.secure honour X-Forwarded-Proto from the local Cloudflare tunnel.
+if (config.trustProxy && config.trustProxy !== "false") {
+  app.set("trust proxy", config.trustProxy);
+}
 
-// Error text is only returned to clients when explicitly enabled (development).
-const EXPOSE_ERROR_DETAILS = process.env.EXPOSE_ERROR_DETAILS === "true";
+const FRONTEND_DIR = config.frontendDir;
+const MUSIC_DIR = config.musicDir;
+const COVERS_DIR = config.coversDir;
+const EXPOSE_ERROR_DETAILS = config.exposeErrorDetails;
 
-// Optional shared secret protecting write endpoints (see .env.example).
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
-const writeGuard = requireWriteAuth(ADMIN_TOKEN);
+// Fail-closed: without a valid MUSICAPP_WRITE_TOKEN every write route answers 503.
+const writeGuard = requireWriteAuth({
+  token: config.writeToken,
+  configured: config.writeAuthConfigured,
+  requireHttps: config.requireHttps
+});
 
-// CORS: comma-separated allow-list; unset keeps the existing open behaviour.
-const corsOrigins = (process.env.CORS_ORIGINS || "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
+// Only configured origins receive CORS headers. CORS is not authentication.
+app.use(cors(buildCorsOptions(config.corsOrigins)));
 app.use(express.json({ limit: "512kb" }));
 
 app.use(express.static(FRONTEND_DIR));
 app.use("/music", express.static(MUSIC_DIR));
 app.use("/covers", express.static(COVERS_DIR));
 
-const pool = new Pool({
-host: process.env.DB_HOST,
-port: process.env.DB_PORT,
-database: process.env.DB_NAME,
-user: process.env.DB_USER,
-password: process.env.DB_PASSWORD,
-max: 10,
-idleTimeoutMillis: 30000,
-connectionTimeoutMillis: 5000
-});
-
 /* =========================
 ROOT
 ========================= */
 
 // MADINENI LYRICS START
-require("./madineni-lyrics.cjs").mount(app, pool, {musicDir:MUSIC_DIR, writeGuard});
+require("./madineni-lyrics.cjs").mount(app, pool, {musicDir:MUSIC_DIR, ...lyricsOptions, writeGuard});
 // MADINENI LYRICS END
 
 
@@ -75,15 +68,9 @@ app.get("/api/health", async (req, res) => {
 
 try {
 
-const result =
-  await pool.query("SELECT NOW() AS time");
+await pool.query("SELECT 1");
 
-res.json({
-  success: true,
-  status: "ok",
-  database: "connected",
-  time: result.rows[0].time
-});
+res.json({ success: true, status: "ok" });
 
 } catch (error) {
 
@@ -92,35 +79,20 @@ console.error(
   error.message
 );
 
-res.status(503).json({
-  success: false,
-  status: "error",
-  database: "disconnected",
-  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
-});
+res.status(503).json({ success: false, status: "error" });
 
 }
 
 });
 
-/* =========================
-DB TEST
-========================= */
-
+// Kept for compatibility; exposes no database name, host or timestamp.
 app.get("/api/db-test", async (req, res) => {
 
 try {
 
-const result =
-  await pool.query(
-    "SELECT NOW() AS current_time"
-  );
+await pool.query("SELECT 1");
 
-res.json({
-  connected: true,
-  database: process.env.DB_NAME,
-  time: result.rows[0].current_time
-});
+res.json({ connected: true });
 
 } catch (error) {
 
@@ -129,10 +101,7 @@ console.error(
   error.message
 );
 
-res.status(500).json({
-  connected: false,
-  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
-});
+res.status(503).json({ connected: false });
 
 }
 
@@ -161,35 +130,11 @@ const album =
     ? req.query.album.trim()
     : "";
 
-let limit =
-  Number.parseInt(
-    req.query.limit,
-    10
-  );
-
-let offset =
-  Number.parseInt(
-    req.query.offset,
-    10
-  );
-
-if (
-  !Number.isInteger(limit) ||
-  limit <= 0
-) {
-  limit = 1000000;
-}
-
-if (limit > 1000000) {
-  limit = 1000000;
-}
-
-if (
-  !Number.isInteger(offset) ||
-  offset < 0
-) {
-  offset = 0;
-}
+const { limit, offset } =
+  parsePagination(req.query, {
+    defaultSize: config.defaultPageSize,
+    maxSize: config.maxPageSize
+  });
 
 const conditions = [];
 const values = [];
@@ -850,6 +795,13 @@ try {
 
 } catch (error) {
 
+  if (error.code === "23503") {
+    return res.status(404).json({
+      success: false,
+      error: "Playlist or song not found"
+    });
+  }
+
   console.error(
     "Add playlist song error:",
     error.message
@@ -969,49 +921,9 @@ try {
 
   }
 
-  // Both deletes run in one transaction so a failure cannot leave a
-  // playlist with its songs removed but the playlist itself still present.
-  const client = await pool.connect();
-  let result;
+  const deleted = await deletePlaylist(pool, playlistId);
 
-  try {
-
-    await client.query("BEGIN");
-
-    await client.query(
-      `
-      DELETE FROM playlist_songs
-      WHERE playlist_id = $1
-      `,
-      [playlistId]
-    );
-
-    result = await client.query(
-      `
-      DELETE FROM playlists
-      WHERE id = $1
-
-      RETURNING
-        id,
-        name
-      `,
-      [playlistId]
-    );
-
-    await client.query("COMMIT");
-
-  } catch (transactionError) {
-
-    await client.query("ROLLBACK").catch(() => {});
-    throw transactionError;
-
-  } finally {
-
-    client.release();
-
-  }
-
-  if (!result.rows.length) {
+  if (!deleted) {
 
     return res.status(404).json({
       success: false,
@@ -1022,7 +934,7 @@ try {
 
   res.json({
     success: true,
-    data: result.rows[0]
+    data: deleted
   });
 
 } catch (error) {
@@ -1060,31 +972,54 @@ path: req.path
 
 app.use(jsonErrorHandler(EXPOSE_ERROR_DETAILS));
 
+return app;
+
+}
+
 /* =========================
 SERVER
 ========================= */
 
-app.listen(
-PORT,
-"0.0.0.0",
-() => {
+function start() {
 
-console.log("");
-console.log("======================================");
-console.log("       MUSIC APP API SERVER");
-console.log("======================================");
-console.log("Port:      " + PORT);
-console.log(
-  "Local:     http://127.0.0.1:" + PORT
-);
-console.log(
-  "Wi-Fi:     http://192.168.4.204:" + PORT
-);
-console.log(
-  "Tailscale: http://100.83.79.17:" + PORT
-);
-console.log("======================================");
-console.log("");
+  require("dotenv").config({
+    path: process.env.ENV_FILE || "/opt/musicapp/app/config/.env"
+  });
+
+  const { Pool } = require("pg");
+  const config = loadConfig(process.env);
+
+  if (!config.writeAuthConfigured) {
+    console.warn(
+      "WARNING: MUSICAPP_WRITE_TOKEN is " +
+      (config.writeTokenTooShort ? "shorter than 32 characters" : "not set") +
+      ". Playlist and lyrics write routes are DISABLED (503)."
+    );
+  }
+
+  const pool = new Pool({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000
+  });
+
+  createApp({ pool, config }).listen(
+    config.port,
+    "0.0.0.0",
+    () => {
+      console.log("Music app API listening on port " + config.port);
+    }
+  );
 
 }
-);
+
+if (require.main === module) {
+  start();
+}
+
+module.exports = { createApp };

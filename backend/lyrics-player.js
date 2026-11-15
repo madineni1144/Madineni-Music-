@@ -42,6 +42,64 @@
       if (className) node.className = className;
       return node;
     };
+    // ---- Write authentication (manual lyrics save) ----
+    // The write token is typed by an authorized user, kept only in this
+    // closure (never stored, never placed in a URL) and sent in the
+    // Authorization header. It is refused over plain HTTP except on localhost.
+    let writeToken = '';
+    const canSendToken = () => {
+      try {
+        const url = new URL(base || location.origin, location.href);
+        return url.protocol === 'https:' || ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+      } catch { return false; }
+    };
+    function askForToken(message) {
+      return new Promise(resolve => {
+        const box = document.createElement('dialog');
+        box.className = 'mm-lyrics-dialog';
+        const form = el('form'); form.method = 'dialog';
+        const label = el('p', message);
+        const input = document.createElement('input');
+        input.type = 'password'; input.autocomplete = 'off'; input.required = true;
+        input.setAttribute('aria-label', 'Write token');
+        input.style.cssText = 'width:100%;padding:10px;margin:12px 0;box-sizing:border-box';
+        const save = el('button', 'Use token', 'mm-lyrics-retry'); save.value = 'ok';
+        const cancel = el('button', 'Cancel', 'mm-lyrics-retry'); cancel.value = 'cancel'; cancel.formNoValidate = true;
+        cancel.style.marginLeft = '10px';
+        form.append(label, input, save, cancel); box.append(form);
+        box.addEventListener('close', () => {
+          const value = box.returnValue === 'ok' ? input.value.trim() : '';
+          input.value = ''; box.remove(); resolve(value || null);
+        });
+        document.body.append(box); box.showModal(); input.focus();
+      });
+    }
+    async function saveLyrics(songId, payload) {
+      if (!canSendToken()) return {ok:false, message:'Saving lyrics requires HTTPS. Open the app over https:// to continue.'};
+      let message = 'Enter the write token to save lyrics. It is kept in memory only.';
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (!writeToken) {
+          const entered = await askForToken(message);
+          if (!entered) return {ok:false, message:'Save cancelled: no token entered.'};
+          writeToken = entered;
+        }
+        let response, body = {};
+        try {
+          response = await fetch(`${base}/api/songs/${encodeURIComponent(songId)}/lyrics`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${writeToken}`},
+            body: JSON.stringify(payload)
+          });
+          body = await response.json().catch(() => ({}));
+        } catch { return {ok:false, message:'Network error while saving lyrics.'}; }
+        if (response.status === 401) { writeToken = ''; message = 'That token was not accepted. Enter the write token again.'; continue; }
+        if (response.status === 503 && body.code === 'WRITE_AUTH_UNAVAILABLE') return {ok:false, message:'Saving is disabled: the server has no write token configured.'};
+        if (response.status === 403 && body.code === 'HTTPS_REQUIRED') return {ok:false, message:'The server requires HTTPS for saving lyrics.'};
+        if (response.ok && body.success) return {ok:true};
+        return {ok:false, message: body.error || `Save failed (HTTP ${response.status}).`};
+      }
+      return {ok:false, message:'The write token was rejected too many times.'};
+    }
     const visible = () => active && !!host && !!host.querySelector('.mm-lyrics-view') && (!dialog || dialog.open);
     function stop() {
       active = false; generation++; request?.abort(); clearTimeout(retryTimer);
@@ -114,21 +172,20 @@
           const addBtn = el('button', '+ Add / Paste Lyrics', 'mm-lyrics-retry');
           addBtn.type = 'button';
           addBtn.style.marginLeft = '10px';
-          addBtn.onclick = () => {
+          const statusLine = el('p', '', 'mm-lyrics-meta');
+          statusLine.setAttribute('role', 'alert');
+          addBtn.onclick = async () => {
             const input = prompt('Paste plain lyrics or synchronized LRC timestamps for this song:');
             if (!input || !input.trim()) return;
             const isSynced = /\[\d{1,3}:\d{1,2}/.test(input);
             const payload = isSynced ? { syncedLyrics: input.trim() } : { plainLyrics: input.trim() };
-            fetch(`${base}/api/songs/${encodeURIComponent(activeId)}/lyrics`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            }).then(r => r.json()).then(res => {
-              if (res.success) load({ refresh: true });
-              else alert('Failed to save lyrics: ' + (res.error || 'Unknown error'));
-            }).catch(e => alert('Error saving lyrics: ' + e.message));
+            addBtn.disabled = true; statusLine.textContent = 'Saving lyrics…';
+            const outcome = await saveLyrics(activeId, payload);
+            addBtn.disabled = false;
+            if (outcome.ok) load({ refresh: true });
+            else statusLine.textContent = outcome.message;
           };
-          actionsBox.append(addBtn);
+          actionsBox.append(addBtn, statusLine);
           body.append(actionsBox);
           return;
         }
