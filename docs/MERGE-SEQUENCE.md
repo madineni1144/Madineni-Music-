@@ -53,11 +53,13 @@ Tamil, mixed script, Latin) through three functions.
 - With `fold()` replaced by the shared functions, `node scripts/metadata-investigate.js` output was
   byte-identical to `docs/samples/metadata-review` (the fixtures contain no decorated non-Latin strings, so
   that proves nothing about decorated input). Add fixtures/tests for the cases above before relying on it.
-- **Landmine for the merge itself:** `backend/test/metadata.test.js` (the "Telugu script" test) asserts
-  `lyrics-core.normalize("గీత") === "గ త"` - i.e. it asserts the bug #6 fixes. After #6 is merged into #4 that
-  test fails, with or without `fold()` removed (reproduced on the scratch merge: 27 of 28 pass, 1 fail).
-  #4 carries a commit that removes the coupling (the test now asserts the matcher's own result, which is
-  the same before and after #6), so the merge into #4 stays green.
+- **Stale assertion (found and fixed after #6 merged):** `backend/test/metadata.test.js` (the "Telugu script"
+  test) asserted `lyrics-core.normalize("గీత") === "గ త"` - i.e. it asserted the bug #6 fixes. #4 did not
+  carry a fix for this beforehand (an earlier version of this document wrongly said it did). When `main`
+  (with #6) was merged into #4, that test failed and `backend tests` failed on that head (run 43977923107).
+  The assertion was then replaced with one on the matcher's own result, which is the same before and after
+  #6. The metadata matching code (`backend/metadata/matcher.js`, including `fold()`) was unchanged;
+  only the test changed.
 
 Plan after #6 is on `main` and merged into #4: replace the `safe(...)` wrappers with the shared functions in
 one commit; add regression tests for each category above (decorated Telugu title, album edition suffix,

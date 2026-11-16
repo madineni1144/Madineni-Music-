@@ -1,0 +1,398 @@
+{
+  "reports": [
+    {
+      "kind": "album-metadata-review",
+      "version": 1,
+      "generatedAt": "2026-01-01T00:00:00.000Z",
+      "mode": "recommend_fixes_read_only",
+      "localAlbumId": "fx-1",
+      "status": "probable",
+      "reason": "partial agreement (missing evidence: artist, year); human review required",
+      "confidence": 0.75,
+      "evidence": {
+        "title": 1,
+        "artist": null,
+        "tracks": 1,
+        "year": null,
+        "language": 1,
+        "duration": 1
+      },
+      "matchLevel": {
+        "entity": "release",
+        "releaseId": "00000000-0000-4000-8000-000000000101",
+        "releaseGroupId": "00000000-0000-4000-8000-000000000001",
+        "note": "album=local row; release=specific edition; release group=all editions; recordings linked per track"
+      },
+      "existing": {
+        "title": "Fixture Sparse Album (Original Motion Picture Soundtrack)",
+        "artist": null,
+        "year": null,
+        "language": "Telugu",
+        "trackCount": 4,
+        "coverPath": null
+      },
+      "proposed": {
+        "title": null,
+        "artist": "Fixture Composer",
+        "year": 2018,
+        "language": null,
+        "trackCount": null,
+        "externalIds": {
+          "musicbrainzReleaseId": "00000000-0000-4000-8000-000000000101",
+          "musicbrainzReleaseGroupId": "00000000-0000-4000-8000-000000000001",
+          "musicbrainzArtistIds": [
+            "00000000-0000-4000-8000-000000000501"
+          ]
+        }
+      },
+      "provenance": {
+        "artist": {
+          "value": "Fixture Composer",
+          "provider": "musicbrainz",
+          "releaseId": "00000000-0000-4000-8000-000000000101",
+          "sourceUrl": "https://musicbrainz.org/release/00000000-0000-4000-8000-000000000101",
+          "fetchedAt": "2026-01-01T00:00:00.000Z"
+        },
+        "year": {
+          "value": 2018,
+          "provider": "musicbrainz",
+          "releaseId": "00000000-0000-4000-8000-000000000101",
+          "sourceUrl": "https://musicbrainz.org/release/00000000-0000-4000-8000-000000000101",
+          "fetchedAt": "2026-01-01T00:00:00.000Z"
+        },
+        "externalIds": {
+          "value": {
+            "musicbrainzReleaseId": "00000000-0000-4000-8000-000000000101",
+            "musicbrainzReleaseGroupId": "00000000-0000-4000-8000-000000000001",
+            "musicbrainzArtistIds": [
+              "00000000-0000-4000-8000-000000000501"
+            ]
+          },
+          "provider": "musicbrainz",
+          "releaseId": "00000000-0000-4000-8000-000000000101",
+          "sourceUrl": "https://musicbrainz.org/release/00000000-0000-4000-8000-000000000101",
+          "fetchedAt": "2026-01-01T00:00:00.000Z"
+        }
+      },
+      "conflicts": [],
+      "flags": [
+        "alternate_title_form"
+      ],
+      "fieldNotes": [
+        "Probable match: a human must confirm before any value is applied."
+      ],
+      "recordingLinks": [
+        {
+          "localTitle": "Alpha Song",
+          "candidateTitle": "Alpha Song",
+          "recordingId": "00000000-0000-4000-8000-000000009000"
+        },
+        {
+          "localTitle": "Beta Song",
+          "candidateTitle": "Beta Song",
+          "recordingId": "00000000-0000-4000-8000-000000009001"
+        },
+        {
+          "localTitle": "Gamma Song",
+          "candidateTitle": "Gamma Song",
+          "recordingId": "00000000-0000-4000-8000-000000009002"
+        },
+        {
+          "localTitle": "Delta Song",
+          "candidateTitle": "Delta Song",
+          "recordingId": "00000000-0000-4000-8000-000000009003"
+        }
+      ],
+      "alternatives": [
+        {
+          "releaseId": "00000000-0000-4000-8000-000000000102",
+          "releaseGroupId": "00000000-0000-4000-8000-000000000002",
+          "title": "Unrelated Thing",
+          "language": "eng",
+          "year": 2010,
+          "score": 0
+        }
+      ],
+      "sources": [
+        {
+          "provider": "musicbrainz",
+          "url": "https://musicbrainz.org/release/00000000-0000-4000-8000-000000000101",
+          "fetchedAt": "2026-01-01T00:00:00.000Z",
+          "license": "MusicBrainz core data is CC0; supplementary data is CC BY-NC-SA"
+        }
+      ],
+      "artwork": {
+        "releaseId": "00000000-0000-4000-8000-000000000101",
+        "status": "unknown",
+        "source": "fixture",
+        "note": "no fixture"
+      },
+      "untrustedExternalData": true
+    },
+    {
+      "kind": "album-metadata-review",
+      "version": 1,
+      "generatedAt": "2026-01-01T00:00:00.000Z",
+      "mode": "recommend_fixes_read_only",
+      "localAlbumId": "fx-2",
+      "status": "ambiguous",
+      "reason": "two different release groups score within 0.05",
+      "confidence": 0.9,
+      "evidence": {
+        "title": 1,
+        "artist": 1,
+        "tracks": 1,
+        "year": 1,
+        "language": null,
+        "duration": 1
+      },
+      "matchLevel": {
+        "entity": "release",
+        "releaseId": "00000000-0000-4000-8000-000000000201",
+        "releaseGroupId": "00000000-0000-4000-8000-000000000011",
+        "note": "album=local row; release=specific edition; release group=all editions; recordings linked per track"
+      },
+      "existing": {
+        "title": "Fixture Ambiguous Film",
+        "artist": "Fixture Composer",
+        "year": 2020,
+        "language": null,
+        "trackCount": 3,
+        "coverPath": null
+      },
+      "proposed": {
+        "title": null,
+        "artist": null,
+        "year": null,
+        "language": null,
+        "trackCount": null,
+        "externalIds": {
+          "musicbrainzReleaseId": null,
+          "musicbrainzReleaseGroupId": null,
+          "musicbrainzArtistIds": []
+        }
+      },
+      "provenance": {},
+      "conflicts": [],
+      "flags": [
+        "language_unknown",
+        "ambiguous_release_group"
+      ],
+      "fieldNotes": [],
+      "recordingLinks": [
+        {
+          "localTitle": "Ek",
+          "candidateTitle": "Ek",
+          "recordingId": "00000000-0000-4000-8000-000000009000"
+        },
+        {
+          "localTitle": "Do",
+          "candidateTitle": "Do",
+          "recordingId": "00000000-0000-4000-8000-000000009001"
+        },
+        {
+          "localTitle": "Teen",
+          "candidateTitle": "Teen",
+          "recordingId": "00000000-0000-4000-8000-000000009002"
+        }
+      ],
+      "alternatives": [
+        {
+          "releaseId": "00000000-0000-4000-8000-000000000202",
+          "releaseGroupId": "00000000-0000-4000-8000-000000000012",
+          "title": "Fixture Ambiguous Film",
+          "language": "tam",
+          "year": 2020,
+          "score": 0.9
+        }
+      ],
+      "sources": [
+        {
+          "provider": "musicbrainz",
+          "url": "https://musicbrainz.org/release/00000000-0000-4000-8000-000000000201",
+          "fetchedAt": "2026-01-01T00:00:00.000Z",
+          "license": "MusicBrainz core data is CC0; supplementary data is CC BY-NC-SA"
+        }
+      ],
+      "artwork": {
+        "releaseId": "00000000-0000-4000-8000-000000000201",
+        "status": "unknown",
+        "source": "fixture",
+        "note": "no fixture"
+      },
+      "untrustedExternalData": true
+    },
+    {
+      "kind": "album-metadata-review",
+      "version": 1,
+      "generatedAt": "2026-01-01T00:00:00.000Z",
+      "mode": "recommend_fixes_read_only",
+      "localAlbumId": "fx-3",
+      "status": "none",
+      "reason": "provider returned no candidates",
+      "confidence": 0,
+      "evidence": null,
+      "matchLevel": null,
+      "existing": {
+        "title": "Fixture Missing Album",
+        "artist": "Nobody",
+        "year": 2001,
+        "language": "Telugu",
+        "trackCount": 1,
+        "coverPath": null
+      },
+      "proposed": {
+        "title": null,
+        "artist": null,
+        "year": null,
+        "language": null,
+        "trackCount": null,
+        "externalIds": {
+          "musicbrainzReleaseId": null,
+          "musicbrainzReleaseGroupId": null,
+          "musicbrainzArtistIds": []
+        }
+      },
+      "provenance": {},
+      "conflicts": [],
+      "flags": [],
+      "fieldNotes": [],
+      "recordingLinks": [],
+      "alternatives": [],
+      "sources": [],
+      "artwork": null,
+      "untrustedExternalData": true
+    },
+    {
+      "kind": "album-metadata-review",
+      "version": 1,
+      "generatedAt": "2026-01-01T00:00:00.000Z",
+      "mode": "recommend_fixes_read_only",
+      "localAlbumId": "fx-5",
+      "status": "clear",
+      "reason": "title, artist, tracks and a known language agree",
+      "confidence": 1,
+      "evidence": {
+        "title": 1,
+        "artist": 1,
+        "tracks": 1,
+        "year": 1,
+        "language": 1,
+        "duration": 1
+      },
+      "matchLevel": {
+        "entity": "release",
+        "releaseId": "00000000-0000-4000-8000-000000000301",
+        "releaseGroupId": "00000000-0000-4000-8000-000000000021",
+        "note": "album=local row; release=specific edition; release group=all editions; recordings linked per track"
+      },
+      "existing": {
+        "title": "Fixture Edition Album",
+        "artist": "Edition Artist",
+        "year": 2018,
+        "language": "English",
+        "trackCount": 5,
+        "coverPath": null
+      },
+      "proposed": {
+        "title": null,
+        "artist": null,
+        "year": null,
+        "language": null,
+        "trackCount": null,
+        "externalIds": {
+          "musicbrainzReleaseId": "00000000-0000-4000-8000-000000000301",
+          "musicbrainzReleaseGroupId": "00000000-0000-4000-8000-000000000021",
+          "musicbrainzArtistIds": [
+            "00000000-0000-4000-8000-000000000504"
+          ]
+        }
+      },
+      "provenance": {
+        "externalIds": {
+          "value": {
+            "musicbrainzReleaseId": "00000000-0000-4000-8000-000000000301",
+            "musicbrainzReleaseGroupId": "00000000-0000-4000-8000-000000000021",
+            "musicbrainzArtistIds": [
+              "00000000-0000-4000-8000-000000000504"
+            ]
+          },
+          "provider": "musicbrainz",
+          "releaseId": "00000000-0000-4000-8000-000000000301",
+          "sourceUrl": "https://musicbrainz.org/release/00000000-0000-4000-8000-000000000301",
+          "fetchedAt": "2026-01-01T00:00:00.000Z"
+        }
+      },
+      "conflicts": [],
+      "flags": [
+        "edition_or_version",
+        "other_editions_in_same_release_group"
+      ],
+      "fieldNotes": [],
+      "recordingLinks": [
+        {
+          "localTitle": "One",
+          "candidateTitle": "One",
+          "recordingId": "00000000-0000-4000-8000-000000009000"
+        },
+        {
+          "localTitle": "Two",
+          "candidateTitle": "Two",
+          "recordingId": "00000000-0000-4000-8000-000000009001"
+        },
+        {
+          "localTitle": "Three",
+          "candidateTitle": "Three",
+          "recordingId": "00000000-0000-4000-8000-000000009002"
+        },
+        {
+          "localTitle": "Four",
+          "candidateTitle": "Four",
+          "recordingId": "00000000-0000-4000-8000-000000009003"
+        },
+        {
+          "localTitle": "Five",
+          "candidateTitle": "Five",
+          "recordingId": "00000000-0000-4000-8000-000000009004"
+        }
+      ],
+      "alternatives": [
+        {
+          "releaseId": "00000000-0000-4000-8000-000000000302",
+          "releaseGroupId": "00000000-0000-4000-8000-000000000021",
+          "title": "Fixture Edition Album (Deluxe Edition)",
+          "language": "eng",
+          "year": 2019,
+          "score": 0.795
+        }
+      ],
+      "sources": [
+        {
+          "provider": "musicbrainz",
+          "url": "https://musicbrainz.org/release/00000000-0000-4000-8000-000000000301",
+          "fetchedAt": "2026-01-01T00:00:00.000Z",
+          "license": "MusicBrainz core data is CC0; supplementary data is CC BY-NC-SA"
+        }
+      ],
+      "artwork": {
+        "releaseId": "00000000-0000-4000-8000-000000000301",
+        "status": "unknown",
+        "source": "fixture",
+        "note": "no fixture"
+      },
+      "untrustedExternalData": true
+    }
+  ],
+  "failures": [
+    {
+      "ts": "2026-01-01T00:00:00.000Z",
+      "tool": "investigate_album",
+      "ok": false,
+      "error": "malformed",
+      "input": {
+        "title": "Fixture Malformed Album"
+      },
+      "ms": 0
+    }
+  ]
+}

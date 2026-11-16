@@ -1,0 +1,103 @@
+[
+  {
+    "id": "fx-1",
+    "title": "Fixture Sparse Album (Original Motion Picture Soundtrack)",
+    "artist": null,
+    "year": null,
+    "language": "Telugu",
+    "tracks": [
+      {
+        "title": "Alpha Song",
+        "durationSec": 240
+      },
+      {
+        "title": "Beta Song",
+        "durationSec": 240
+      },
+      {
+        "title": "Gamma Song",
+        "durationSec": 240
+      },
+      {
+        "title": "Delta Song",
+        "durationSec": 240
+      }
+    ]
+  },
+  {
+    "id": "fx-2",
+    "title": "Fixture Ambiguous Film",
+    "artist": "Fixture Composer",
+    "year": 2020,
+    "language": null,
+    "tracks": [
+      {
+        "title": "Ek",
+        "durationSec": 240
+      },
+      {
+        "title": "Do",
+        "durationSec": 240
+      },
+      {
+        "title": "Teen",
+        "durationSec": 240
+      }
+    ]
+  },
+  {
+    "id": "fx-3",
+    "title": "Fixture Missing Album",
+    "artist": "Nobody",
+    "year": 2001,
+    "language": "Telugu",
+    "tracks": [
+      {
+        "title": "Lost",
+        "durationSec": 200
+      }
+    ]
+  },
+  {
+    "id": "fx-4",
+    "title": "Fixture Malformed Album",
+    "artist": "Someone",
+    "year": 2015,
+    "language": null,
+    "tracks": [
+      {
+        "title": "X",
+        "durationSec": 100
+      }
+    ]
+  },
+  {
+    "id": "fx-5",
+    "title": "Fixture Edition Album",
+    "artist": "Edition Artist",
+    "year": 2018,
+    "language": "English",
+    "tracks": [
+      {
+        "title": "One",
+        "durationSec": 240
+      },
+      {
+        "title": "Two",
+        "durationSec": 240
+      },
+      {
+        "title": "Three",
+        "durationSec": 240
+      },
+      {
+        "title": "Four",
+        "durationSec": 240
+      },
+      {
+        "title": "Five",
+        "durationSec": 240
+      }
+    ]
+  }
+]
