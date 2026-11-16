@@ -138,17 +138,56 @@ test("every write route answers 503 when MUSICAPP_WRITE_TOKEN is missing", opts,
   }
 });
 
+// Root cause of the old 401-vs-429 failure: this test sent 15 bad-token requests (5 routes x 3) from ONE client
+// (127.0.0.1) to ONE app whose lockout limit is 10, so the 10th failure correctly locked the client out. The
+// limiter is created per createApp() and did not leak between tests. Each route is now probed by its own client
+// (CF-Connecting-IP is honoured from the loopback peer in cloudflare mode), keeping every client below the limit.
 test("write routes reject missing or invalid tokens with 401 and never touch the database", opts, async () => {
   const pool = makePool();
   await withServer({ MUSICAPP_WRITE_TOKEN: TOKEN }, pool, async (base) => {
-    for (const route of WRITES) {
-      assert.equal((await request(base, route, HTTPS)).status, 401);
-      assert.equal((await request(base, route, { ...HTTPS, Authorization: "Bearer nope" })).status, 401);
-      assert.equal((await request(base, route, { ...HTTPS, Authorization: TOKEN })).status, 401);
+    for (const [i, route] of WRITES.entries()) {
+      const client = { ...HTTPS, "CF-Connecting-IP": `203.0.113.${i + 1}` }; // 3 failures per client, limit is 10
+      assert.equal((await request(base, route, client)).status, 401);
+      assert.equal((await request(base, route, { ...client, Authorization: "Bearer nope" })).status, 401);
+      assert.equal((await request(base, route, { ...client, Authorization: TOKEN })).status, 401);
     }
   });
   assert.equal(pool.queries.filter(isWrite).length, 0);
   assert.equal(pool.clients.length, 0);
+});
+
+test("invalid authentication answers 401 up to the lockout limit and 429 after it (limit is enforced, not relaxed)", opts, async () => {
+  const pool = makePool();
+  await withServer({ MUSICAPP_WRITE_TOKEN: TOKEN, MUSICAPP_AUTH_FAIL_MAX: "4" }, pool, async (base) => {
+    const client = { ...HTTPS, "CF-Connecting-IP": "203.0.113.50", Authorization: "Bearer wrong" };
+    const seen = [];
+    for (let i = 0; i < 6; i++) seen.push((await request(base, WRITES[0], client)).status);
+    assert.deepEqual(seen, [401, 401, 401, 429, 429, 429]); // 4th failure reaches the max and locks
+  });
+  assert.equal(pool.queries.filter(isWrite).length, 0);
+});
+
+test("lockout is per client: a locked-out client does not lock out others", opts, async () => {
+  await withServer({ MUSICAPP_WRITE_TOKEN: TOKEN, MUSICAPP_AUTH_FAIL_MAX: "3" }, makePool(), async (base) => {
+    const a = { ...HTTPS, "CF-Connecting-IP": "203.0.113.60", Authorization: "Bearer wrong" };
+    for (let i = 0; i < 3; i++) await request(base, WRITES[0], a);
+    assert.equal((await request(base, WRITES[0], a)).status, 429, "client A is locked out");
+    const b = { ...HTTPS, "CF-Connecting-IP": "203.0.113.61" };
+    assert.equal((await request(base, WRITES[0], { ...b, Authorization: "Bearer wrong" })).status, 401, "client B is not locked");
+    const ok = await request(base, WRITES[0], { ...b, ...AUTH });
+    assert.ok(![401, 429, 503].includes(ok.status), `client B with the right token is accepted (got ${ok.status})`);
+  });
+});
+
+test("lockout state is not shared between app instances (no cross-test leakage)", opts, async () => {
+  const lock = { ...HTTPS, "CF-Connecting-IP": "203.0.113.70", Authorization: "Bearer wrong" };
+  await withServer({ MUSICAPP_WRITE_TOKEN: TOKEN, MUSICAPP_AUTH_FAIL_MAX: "2" }, makePool(), async (base) => {
+    await request(base, WRITES[0], lock);
+    assert.equal((await request(base, WRITES[0], lock)).status, 429);
+  });
+  await withServer({ MUSICAPP_WRITE_TOKEN: TOKEN, MUSICAPP_AUTH_FAIL_MAX: "2" }, makePool(), async (base) => {
+    assert.equal((await request(base, WRITES[0], lock)).status, 401, "a fresh app starts with a clean limiter");
+  });
 });
 
 test("a valid token over plain HTTP is refused (403) unless HTTPS is explicitly relaxed", opts, async () => {
