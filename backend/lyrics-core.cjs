@@ -14,8 +14,12 @@ function clean(value) {
     .replace(/\s+/g, ' ').trim();
 }
 function normalize(value) {
+  // Keep combining marks (\p{M}): Telugu/Indic vowel signs, virama and anusvara are marks, and replacing them with a
+  // space split words and made different words collide. ZWNJ/ZWJ only shape glyphs inside a word, so they are removed,
+  // not turned into word boundaries. Latin output is unchanged (NFKC already composes accents).
   return clean(value).toLocaleLowerCase('en-US')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
+    .replace(/[\u200c\u200d]/g, '')
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
 }
 function titleKey(value) {
   let s = clean(value)
@@ -129,4 +133,4 @@ function recordPayload(songId, row) {
     retry_after:row.expires_at || null,
   };
 }
-module.exports = {clean, normalize, metadata, fingerprint, matchScore, pickMatch, parseLrc, recordPayload};
+module.exports = {clean, normalize, titleKey, albumKey, artists, known, metadata, fingerprint, matchScore, pickMatch, parseLrc, recordPayload};
