@@ -19,7 +19,7 @@ Ingestion (legacy + v2) stays paused. External artwork verification stays disabl
 
 ## 2. Gap table (public-apis used as discovery only)
 
-Catalogue reviewed directly: public-apis commit `d6dab92`, section **Music** (37 entries) and section **MCP Servers** (53 entries); see section 2b. Candidate facts below come from each provider's own docs/terms where they could be read; items not read are marked.
+Catalogue reviewed directly: public-apis commit `d6dab92`, section **Music** (39 entries) and section **MCP Servers** (53 entries); see section 2b. Candidate facts below come from each provider's own docs/terms where they could be read; items not read are marked.
 
 | Existing capability | Verified gap | Candidate provider | Required development | Cost/access | Priority |
 |---|---|---|---|---|---|
@@ -35,7 +35,7 @@ Catalogue reviewed directly: public-apis commit `d6dab92`, section **Music** (37
 ### 2b. public-apis review (commit d6dab92)
 
 - **MCP Servers (53 entries): nothing usable.** The only music-adjacent entry is Kuro (AI image/video/voice/music *generation*), which is unrelated to metadata, and we never present generated media as authentic metadata or lyrics. No MCP server for MusicBrainz, Discogs, Last.fm or lyrics is listed.
-- **Music (37 entries), classified against our gaps:**
+- **Music (39 entries), classified against our gaps:**
   - Selected/considered from your list (all present in the catalogue): MusicBrainz (no auth), iTunes Search (no auth), Discogs (OAuth), TheAudioDB (apiKey), LastFm (apiKey), ListenBrainz (no auth), Musixmatch (apiKey), Radio Browser (no auth), Bandsintown (listed "No" auth; its own help page restricts access, so unresolved), Songkick (apiKey; access reportedly closed, unverified).
   - **Songlink/Odesli: catalogue lists `apiKey`, but the real access terms were never read from an official page. Still UNVERIFIED and EXCLUDED from all decisions.**
   - **Newly noticed, not adopted:** JioSaavn and Gaana entries link to *unofficial* GitHub wrappers (no auth). They target Indian catalogues (potentially Telugu) but are scrapers of commercial services; using them raises terms-of-service and reliability risks. Flagged for a legal/product decision only; no code written.
