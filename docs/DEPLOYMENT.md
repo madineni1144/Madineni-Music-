@@ -157,16 +157,30 @@ Verified by `backend/test/client-ip-evasion.test.js` with the production limits 
 
 ## 4. Order of deployment (after approval)
 
+Nothing below runs until you approve it, step by step. Before step 1, the read-only server inspection in
+`docs/SERVER-INSPECTION.md` must have been run and its output reviewed (live directory, configuration names,
+proxy trust, database constraints and privileges, client write/paging usage).
+
+**Phase 1 - isolated candidate tests (production is not touched, not restarted).**
+Check out the candidate commit into a NEW directory (not the live checkout), point it at a scratch database
+and a separate port, set a throwaway write token, and run `npm test` and `scripts/smoke_readonly.sh` against
+`http://127.0.0.1:<scratch port>`. Authenticated write tests belong here, never on production.
+
+**Phase 2 - production deployment (needs explicit approval; each step reversible as in section 7).**
 1. **Back up** (code and config only; do not copy music, covers or database): `tar` the live backend dir,
    the static root, and the environment file (mode 600). Record unit name, working dir, `git`/sha256 state.
 2. **Frontend first.** New pages work with the old API (it already honours `limit`/`offset`, ordered by id).
 3. **Backend**: copy the 9 backend files together, add the section-2 variables, `systemctl restart <unit>`.
 4. Watch `journalctl -u <unit> -n 50`: expect `Music app API listening` and **no** `WARNING: MUSICAPP_WRITE_TOKEN`.
-5. **Isolated smoke test** (section 6). Pipeline and Airflow are not touched.
-6. Manually, in a browser on the public HTTPS hostname: song list shows the full library count; play a song;
-   open lyrics (reading works with no token).
-7. Editing features (needs your token typed in the browser, in memory only) are tested only against a local
-   scratch instance with a scratch database, **not production**, unless you explicitly authorize a production test.
+
+**Phase 3 - post-restart production checks (read-only).**
+5. Browser on the public HTTPS hostname: song list shows the full library count; play a song; open lyrics
+   (reading works with no token).
+6. `scripts/smoke_readonly.sh https://<public hostname>` (section 6). It is NOT an isolated test: it runs
+   against production. Its GETs are read-only, but its invalid unauthenticated write probes are non-GET
+   requests (rejected before the database). Run it only if you approve that explicitly.
+7. Authenticated write features (token typed in the browser, in memory only) are not tested on production
+   unless you separately and explicitly authorize a production write test.
 
 ## 5. Airflow image check (separate tag, no DAG, no integrations)
 
@@ -181,13 +195,17 @@ module the scripts use, runs `pip check`, and imports every pipeline script. **S
 environment (no Docker daemon); not executed.** The `airflow-image` CI job runs the same script.
 Decide separately whether to retag; the DAG remains paused either way.
 
-## 6. Isolated smoke tests
+## 6. Smoke tests: isolated vs production
 
-`bash scripts/smoke_readonly.sh https://<public hostname>` sends no credentials and only: GETs, and write
-probes with deliberately invalid bodies that the hardened server rejects before the database. It refuses to
-send any non-GET request unless `/api/health` already has the hardened shape. It creates no playlists and
-changes no lyrics. Expected: every line `ok`, ending `SMOKE PASSED (read-only)`.
+`bash scripts/smoke_readonly.sh <base url>` sends no credentials and only: GETs, and write probes with
+deliberately invalid bodies that the hardened server rejects before the database. It refuses to send any
+non-GET request unless `/api/health` already has the hardened shape. It creates no playlists and changes no
+lyrics. Expected: every line `ok`, ending `SMOKE PASSED (read-only)`.
 (Its safety logic was exercised against stub servers; it has not been run against your server.)
+
+- **Isolated candidate test (phase 1):** base URL is the scratch instance on a separate port. Safe to run freely.
+- **Production check (phase 3):** base URL is the public hostname. Needs your explicit approval because of the
+  invalid non-GET probes; read-only GET checks (browser, `curl` of `/api/health` and `/api/songs?limit=5`) do not.
 
 Do not run authenticated write tests (create/delete playlist, save lyrics, refresh) on production without
 explicit authorization; if authorized, use a throwaway playlist name and delete only that playlist afterwards.
@@ -196,13 +214,20 @@ explicit authorization; if authorized, use a throwaway playlist name and delete 
 
 **Important:** the previous code has **no authentication**. Rolling the backend back to `2b64c13` (or to
 whatever was live) re-opens public write access to playlists and manual lyrics, and open lyrics refresh,
-through the public tunnel *and* the LAN/Tailscale listener. Choose a rollback that keeps writes blocked:
+through the public tunnel *and* the LAN/Tailscale listener. Two different actions are easy to confuse:
 
-**A. Configuration rollback (preferred, seconds, no code change).** Keep the new code and remove or blank
+- **Disabling writes** (option A): the NEW code keeps running, only writes stop (503). Reads keep working.
+  This is not a return to an earlier release.
+- **Restoring an earlier release** (options B/C below): the OLD code runs again. It has no auth, so writes
+  stay blocked only if you also apply the write-block patch.
+
+Choose a rollback that keeps writes blocked:
+
+**A. Disable writes by configuration (preferred, seconds, no code change; the release stays the new one).** Keep the new code and remove or blank
 `MUSICAPP_WRITE_TOKEN`, then restart. Every write route and `?refresh=1` returns 503; reading, playback,
 search and paging keep working. Verify: `smoke_readonly.sh` still passes.
 
-**B. Code rollback with writes blocked.** Restore the backed-up backend files, then apply
+**B. Restore the earlier release, with writes blocked.** Restore the backed-up backend files, then apply
 `docs/rollback/block-writes-on-2b64c13.patch` to `server.js` (a short middleware that answers 503 to every
 non-GET/HEAD/OPTIONS request and to lyrics refresh). Verified only by `git apply` against `2b64c13` and a
 direct test of the middleware; if the live file drifted from `2b64c13`, insert the same middleware by hand
