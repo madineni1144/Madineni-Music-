@@ -56,7 +56,7 @@ function createMusicBrainz(options = {}) {
   const now = options.now || (() => Date.now());
   const http = options.http || createHttpProvider({
     name: "musicbrainz", baseUrl: options.baseUrl || "https://musicbrainz.org/ws/2/",
-    userAgent: options.userAgent, minIntervalMs: options.minIntervalMs ?? 1100, ...options.httpOptions
+    userAgent: options.userAgent, minIntervalMs: options.minIntervalMs ?? 1100, maxRequests: options.maxRequests ?? 50, ...options.httpOptions
   });
   return {
     name: "musicbrainz",

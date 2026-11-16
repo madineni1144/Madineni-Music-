@@ -4,32 +4,36 @@ const { ProviderError } = require("./errors");
 // Shared HTTP layer for metadata providers: serialized requests with a minimum interval,
 // per-request timeout, bounded retries with backoff, TTL cache, injectable fetch/clock.
 // Credentials (if any) are passed in headers/params by the adapter and are never logged or put in errors.
+const shared = new Map();
 function createHttpProvider(opts) {
   const o = {
     name: "provider", baseUrl: "", userAgent: "", minIntervalMs: 1100, timeoutMs: 8000,
     maxRetries: 2, backoffMs: 500, maxBackoffMs: 5000, cacheTtlMs: 24 * 3600 * 1000, cacheMax: 500,
     fetch: globalThis.fetch, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), now: () => Date.now(),
-    headers: {}, ...opts
+    headers: {}, maxRequests: 100, isolate: false, ...opts
   };
   if (!o.baseUrl.startsWith("https://")) throw new ProviderError("config", `${o.name}: baseUrl must be https`, { provider: o.name });
   if (!o.userAgent) throw new ProviderError("config", `${o.name}: a descriptive User-Agent is required`, { provider: o.name });
   if (typeof o.fetch !== "function") throw new ProviderError("config", `${o.name}: no fetch available`, { provider: o.name });
 
   const cache = new Map();
-  let chain = Promise.resolve();
-  let lastStart = -Infinity;
+  // One limiter per host for the whole process, so several provider instances (or concurrent callers)
+  // can never exceed the host's rate limit together. `isolate` gives tests a private limiter.
+  const host = new URL(o.baseUrl).host;
+  const lim = o.isolate ? { chain: Promise.resolve(), lastStart: -Infinity } : (shared.get(host) || (shared.set(host, { chain: Promise.resolve(), lastStart: -Infinity }), shared.get(host)));
   const stats = { requests: 0, cacheHits: 0, retries: 0, failures: 0 };
 
   function schedule(task) {
-    const run = chain.then(task, task);
-    chain = run.catch(() => {});
+    const run = lim.chain.then(task, task);
+    lim.chain = run.catch(() => {});
     return run;
   }
 
   async function once(url) {
-    const wait = lastStart + o.minIntervalMs - o.now();
+    if (stats.requests >= o.maxRequests) throw new ProviderError("budget", `${o.name}: request budget exhausted (${o.maxRequests})`, { provider: o.name });
+    const wait = lim.lastStart + o.minIntervalMs - o.now();
     if (wait > 0) await o.sleep(wait);
-    lastStart = o.now();
+    lim.lastStart = o.now();
     stats.requests += 1;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), o.timeoutMs);
@@ -63,6 +67,8 @@ function createHttpProvider(opts) {
     const hit = cache.get(key);
     if (hit && hit.exp > o.now()) { stats.cacheHits += 1; return hit.value; }
     return schedule(async () => {
+      const again = cache.get(key); // an identical request queued ahead of us may have filled the cache
+      if (again && again.exp > o.now()) { stats.cacheHits += 1; return again.value; }
       let attempt = 0;
       for (;;) {
         try {

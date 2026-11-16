@@ -1,0 +1,92 @@
+[
+  {
+    "id": "REPLACE_ME-1",
+    "title": "REPLACE_ME album title (as stored)",
+    "artist": "REPLACE_ME or null",
+    "year": null,
+    "language": "Telugu | Tamil | Hindi | null",
+    "tracks": [
+      {
+        "title": "REPLACE_ME track",
+        "durationSec": null
+      }
+    ],
+    "groundTruth": {
+      "inProviderCatalogue": null,
+      "expectedReleaseId": null,
+      "note": "filled by a human reviewer from musicbrainz.org BEFORE looking at matcher output; ignored by the tool"
+    }
+  },
+  {
+    "id": "REPLACE_ME-2",
+    "title": "REPLACE_ME album title (as stored)",
+    "artist": "REPLACE_ME or null",
+    "year": null,
+    "language": "Telugu | Tamil | Hindi | null",
+    "tracks": [
+      {
+        "title": "REPLACE_ME track",
+        "durationSec": null
+      }
+    ],
+    "groundTruth": {
+      "inProviderCatalogue": null,
+      "expectedReleaseId": null,
+      "note": "filled by a human reviewer from musicbrainz.org BEFORE looking at matcher output; ignored by the tool"
+    }
+  },
+  {
+    "id": "REPLACE_ME-3",
+    "title": "REPLACE_ME album title (as stored)",
+    "artist": "REPLACE_ME or null",
+    "year": null,
+    "language": "Telugu | Tamil | Hindi | null",
+    "tracks": [
+      {
+        "title": "REPLACE_ME track",
+        "durationSec": null
+      }
+    ],
+    "groundTruth": {
+      "inProviderCatalogue": null,
+      "expectedReleaseId": null,
+      "note": "filled by a human reviewer from musicbrainz.org BEFORE looking at matcher output; ignored by the tool"
+    }
+  },
+  {
+    "id": "REPLACE_ME-4",
+    "title": "REPLACE_ME album title (as stored)",
+    "artist": "REPLACE_ME or null",
+    "year": null,
+    "language": "Telugu | Tamil | Hindi | null",
+    "tracks": [
+      {
+        "title": "REPLACE_ME track",
+        "durationSec": null
+      }
+    ],
+    "groundTruth": {
+      "inProviderCatalogue": null,
+      "expectedReleaseId": null,
+      "note": "filled by a human reviewer from musicbrainz.org BEFORE looking at matcher output; ignored by the tool"
+    }
+  },
+  {
+    "id": "REPLACE_ME-5",
+    "title": "REPLACE_ME album title (as stored)",
+    "artist": "REPLACE_ME or null",
+    "year": null,
+    "language": "Telugu | Tamil | Hindi | null",
+    "tracks": [
+      {
+        "title": "REPLACE_ME track",
+        "durationSec": null
+      }
+    ],
+    "groundTruth": {
+      "inProviderCatalogue": null,
+      "expectedReleaseId": null,
+      "note": "filled by a human reviewer from musicbrainz.org BEFORE looking at matcher output; ignored by the tool"
+    }
+  }
+]

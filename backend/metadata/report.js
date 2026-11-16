@@ -10,14 +10,22 @@ function buildAlbumReport(local, decision, { generatedAt = new Date().toISOStrin
   const proposed = { title: null, artist: null, year: null, language: null, trackCount: null,
     externalIds: { musicbrainzReleaseId: null, musicbrainzReleaseGroupId: null, musicbrainzArtistIds: [] } };
   const fieldNotes = [];
+  const provenance = {};
+  const cite = (field, value, c) => { provenance[field] = { value, provider: c.provider, releaseId: c.releaseId, sourceUrl: c.sourceUrl, fetchedAt: c.fetchedAt }; };
   if (b && (decision.status === "clear" || decision.status === "probable")) {
     const c = b.candidate;
     // fill gaps only; where a value exists and differs, record a conflict instead of proposing an overwrite
-    if (!existing.artist && c.artists.length && !/^various artists?$/i.test(c.artists.join(", "))) proposed.artist = c.artists.join(", ");
-    if (existing.year == null && c.year != null) proposed.year = c.year;
-    if (!existing.language && c.language) proposed.language = c.language;
-    if (existing.trackCount == null && c.trackCount != null) proposed.trackCount = c.trackCount;
+    if (!existing.artist && c.artists.length && !/^various artists?$/i.test(c.artists.join(", "))) { proposed.artist = c.artists.join(", "); cite("artist", proposed.artist, c); }
+    if (existing.year == null && c.year != null) { proposed.year = c.year; cite("year", c.year, c); }
+    if (!existing.language && c.language) { proposed.language = c.language; cite("language", c.language, c); }
+    if (existing.trackCount == null && c.trackCount != null) { proposed.trackCount = c.trackCount; cite("trackCount", c.trackCount, c); }
     proposed.externalIds = { musicbrainzReleaseId: c.releaseId, musicbrainzReleaseGroupId: c.releaseGroupId, musicbrainzArtistIds: c.artistIds };
+    cite("externalIds", proposed.externalIds, c);
+    // Invariant: nothing is proposed without a source record.
+    for (const [k, v] of Object.entries(proposed)) {
+      const has = k === "externalIds" ? v.musicbrainzReleaseId : v !== null;
+      if (has && !provenance[k]) throw new Error(`proposed field ${k} has no provenance`);
+    }
     if (decision.status === "probable") fieldNotes.push("Probable match: a human must confirm before any value is applied.");
   }
   const conflicts = b ? b.conflicts.slice() : [];
@@ -31,7 +39,7 @@ function buildAlbumReport(local, decision, { generatedAt = new Date().toISOStrin
     confidence: b ? b.score : 0,
     evidence: b ? b.evidence : null,
     matchLevel: b ? { entity: "release", releaseId: b.candidate.releaseId, releaseGroupId: b.candidate.releaseGroupId, note: "album=local row; release=specific edition; release group=all editions; recordings linked per track" } : null,
-    existing, proposed, conflicts, flags, fieldNotes,
+    existing, proposed, provenance, conflicts, flags, fieldNotes,
     recordingLinks: decision.recordingLinks || [],
     alternatives: (decision.alternatives || []).map((a) => ({ releaseId: a.candidate.releaseId, releaseGroupId: a.candidate.releaseGroupId, title: a.candidate.title, language: a.candidate.language, year: a.candidate.year, score: a.score })),
     sources: b ? [{ provider: b.candidate.provider, url: b.candidate.sourceUrl, fetchedAt: b.candidate.fetchedAt, license: "MusicBrainz core data is CC0; supplementary data is CC BY-NC-SA" }] : [],

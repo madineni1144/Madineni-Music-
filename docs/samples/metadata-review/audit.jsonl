@@ -1,0 +1,6 @@
+{"ts":"2026-01-01T00:00:00.000Z","tool":"investigate_album","ok":true,"input":{"title":"Fixture Sparse Album (Original Motion Picture Soundtrack)"},"ms":0,"result":{"status":"probable"}}
+{"ts":"2026-01-01T00:00:00.000Z","tool":"investigate_album","ok":true,"input":{"title":"Fixture Ambiguous Film"},"ms":0,"result":{"status":"ambiguous"}}
+{"ts":"2026-01-01T00:00:00.000Z","tool":"investigate_album","ok":true,"input":{"title":"Fixture Missing Album"},"ms":0,"result":{"status":"none"}}
+{"ts":"2026-01-01T00:00:00.000Z","tool":"investigate_album","ok":false,"error":"malformed","input":{"title":"Fixture Malformed Album"},"ms":0}
+{"ts":"2026-01-01T00:00:00.000Z","tool":"investigate_album","ok":true,"input":{"title":"Fixture Edition Album"},"ms":0,"result":{"status":"clear"}}
+{"ts":"2026-01-01T00:00:00.000Z","tool":"generate_report","ok":true,"input":{},"ms":0,"result":{}}

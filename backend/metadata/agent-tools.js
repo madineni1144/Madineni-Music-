@@ -75,7 +75,7 @@ function createInvestigationTools({ provider, artwork = null, limits = {}, audit
     mode: "recommend_fixes",
     manifest() { return Object.entries(tools).map(([name, t]) => ({ name, description: t.description, inputSchema: t.inputSchema, readOnly: true })); },
     auditLog() { return audit.slice(); },
-    usage() { return { providerCalls: state.providerCalls, albums: state.albums, limits: lim }; },
+    usage() { return { providerCalls: state.providerCalls, albums: state.albums, httpRequests: provider.stats ? provider.stats.requests : null, limits: lim }; },
     async call(name, args) {
       const t0 = now();
       if (!Object.prototype.hasOwnProperty.call(tools, name)) { rec({ tool: name, ok: false, error: "unknown_tool" }); return { ok: false, error: { code: "unknown_tool", message: `unknown tool '${String(name).slice(0, 60)}'` } }; }

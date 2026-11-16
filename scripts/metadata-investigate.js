@@ -18,7 +18,7 @@ async function main(argv, env, out = console) {
     else if (argv[i] === "--live") args.live = true;
     else { out.error(`unknown argument: ${argv[i]}`); return 2; }
   }
-  let albums, provider;
+  let albums, provider, now = () => Date.now();
   if (args.live) {
     if (env.MUSICAPP_METADATA_LIVE !== "1") { out.error("live mode disabled: set MUSICAPP_METADATA_LIVE=1 (needs separate approval)"); return 3; }
     if (!args.sample) { out.error("live mode requires --sample <file> with at most 5 albums; no full-catalogue scans"); return 2; }
@@ -27,13 +27,16 @@ async function main(argv, env, out = console) {
     provider = createMusicBrainz({ userAgent: env.MUSICBRAINZ_USER_AGENT });
   } else {
     albums = args.sample ? JSON.parse(fs.readFileSync(args.sample, "utf8")) : fx.localAlbums;
-    provider = createMusicBrainz({ userAgent: "MadineniMusic-fixtures/0 (offline)", minIntervalMs: 0,
-      httpOptions: { fetch: fx.makeFakeFetch(), sleep: async () => {}, maxRetries: 1, backoffMs: 0 } });
+    now = () => Date.parse("2026-01-01T00:00:00Z"); // fixed clock => byte-reproducible output
+    provider = createMusicBrainz({ userAgent: "MadineniMusic-fixtures/0 (offline)", minIntervalMs: 0, now,
+      httpOptions: { fetch: fx.makeFakeFetch(), sleep: async () => {}, maxRetries: 1, backoffMs: 0, isolate: true } });
   }
   if (!Array.isArray(albums) || albums.length === 0 || albums.length > 5) { out.error("sample must contain 1-5 albums"); return 2; }
+  if (albums.some((a) => /REPLACE_ME/.test(JSON.stringify(a)))) { out.error("sample still contains REPLACE_ME placeholders"); return 2; }
   const auditPath = path.join(args.outDir, "audit.jsonl");
   fs.mkdirSync(args.outDir, { recursive: true, mode: 0o700 });
-  const tools = createInvestigationTools({ provider, artwork: createArtworkMock({}), auditPath });
+  fs.rmSync(auditPath, { force: true });
+  const tools = createInvestigationTools({ provider, artwork: createArtworkMock({}), auditPath, now });
   for (const album of albums) {
     const r = await tools.call("investigate_album", { album });
     out.log(`${album.title}: ${r.ok ? r.result.status : "ERROR " + r.error.code}`);

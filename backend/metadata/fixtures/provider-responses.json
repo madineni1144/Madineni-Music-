@@ -1,0 +1,396 @@
+{
+  "Fixture Sparse Album (Original Motion Picture Soundtrack)": {
+    "releases": [
+      {
+        "id": "00000000-0000-4000-8000-000000000101",
+        "title": "Fixture Sparse Album",
+        "score": 100,
+        "date": "2018-08-01",
+        "country": "IN",
+        "status": "Official",
+        "artist-credit": [
+          {
+            "name": "Fixture Composer",
+            "artist": {
+              "id": "00000000-0000-4000-8000-000000000501",
+              "name": "Fixture Composer"
+            }
+          }
+        ],
+        "release-group": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "primary-type": "Album"
+        },
+        "text-representation": {
+          "language": "tel",
+          "script": "Latn"
+        },
+        "media": [
+          {
+            "position": 1,
+            "tracks": [
+              {
+                "position": 1,
+                "title": "Alpha Song",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009000"
+                }
+              },
+              {
+                "position": 2,
+                "title": "Beta Song",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009001"
+                }
+              },
+              {
+                "position": 3,
+                "title": "Gamma Song",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009002"
+                }
+              },
+              {
+                "position": 4,
+                "title": "Delta Song",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009003"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000102",
+        "title": "Unrelated Thing",
+        "score": 100,
+        "date": "2010",
+        "country": "IN",
+        "status": "Official",
+        "artist-credit": [
+          {
+            "name": "Other",
+            "artist": {
+              "id": "00000000-0000-4000-8000-000000000502",
+              "name": "Other"
+            }
+          }
+        ],
+        "release-group": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "primary-type": "Album"
+        },
+        "text-representation": {
+          "language": "eng",
+          "script": "Latn"
+        },
+        "media": [
+          {
+            "position": 1,
+            "tracks": [
+              {
+                "position": 1,
+                "title": "Q",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009000"
+                }
+              },
+              {
+                "position": 2,
+                "title": "R",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009001"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "Fixture Ambiguous Film": {
+    "releases": [
+      {
+        "id": "00000000-0000-4000-8000-000000000201",
+        "title": "Fixture Ambiguous Film",
+        "score": 100,
+        "date": "2020-01-01",
+        "country": "IN",
+        "status": "Official",
+        "artist-credit": [
+          {
+            "name": "Fixture Composer",
+            "artist": {
+              "id": "00000000-0000-4000-8000-000000000503",
+              "name": "Fixture Composer"
+            }
+          }
+        ],
+        "release-group": {
+          "id": "00000000-0000-4000-8000-000000000011",
+          "primary-type": "Album"
+        },
+        "text-representation": {
+          "language": "tel",
+          "script": "Latn"
+        },
+        "media": [
+          {
+            "position": 1,
+            "tracks": [
+              {
+                "position": 1,
+                "title": "Ek",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009000"
+                }
+              },
+              {
+                "position": 2,
+                "title": "Do",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009001"
+                }
+              },
+              {
+                "position": 3,
+                "title": "Teen",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009002"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000202",
+        "title": "Fixture Ambiguous Film",
+        "score": 100,
+        "date": "2020-01-05",
+        "country": "IN",
+        "status": "Official",
+        "artist-credit": [
+          {
+            "name": "Fixture Composer",
+            "artist": {
+              "id": "00000000-0000-4000-8000-000000000503",
+              "name": "Fixture Composer"
+            }
+          }
+        ],
+        "release-group": {
+          "id": "00000000-0000-4000-8000-000000000012",
+          "primary-type": "Album"
+        },
+        "text-representation": {
+          "language": "tam",
+          "script": "Latn"
+        },
+        "media": [
+          {
+            "position": 1,
+            "tracks": [
+              {
+                "position": 1,
+                "title": "Ek",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009000"
+                }
+              },
+              {
+                "position": 2,
+                "title": "Do",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009001"
+                }
+              },
+              {
+                "position": 3,
+                "title": "Teen",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009002"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "Fixture Missing Album": {
+    "releases": []
+  },
+  "Fixture Malformed Album": {
+    "releases": "not-an-array"
+  },
+  "Fixture Edition Album": {
+    "releases": [
+      {
+        "id": "00000000-0000-4000-8000-000000000301",
+        "title": "Fixture Edition Album",
+        "score": 100,
+        "date": "2018-05-01",
+        "country": "IN",
+        "status": "Official",
+        "artist-credit": [
+          {
+            "name": "Edition Artist",
+            "artist": {
+              "id": "00000000-0000-4000-8000-000000000504",
+              "name": "Edition Artist"
+            }
+          }
+        ],
+        "release-group": {
+          "id": "00000000-0000-4000-8000-000000000021",
+          "primary-type": "Album"
+        },
+        "text-representation": {
+          "language": "eng",
+          "script": "Latn"
+        },
+        "media": [
+          {
+            "position": 1,
+            "tracks": [
+              {
+                "position": 1,
+                "title": "One",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009000"
+                }
+              },
+              {
+                "position": 2,
+                "title": "Two",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009001"
+                }
+              },
+              {
+                "position": 3,
+                "title": "Three",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009002"
+                }
+              },
+              {
+                "position": 4,
+                "title": "Four",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009003"
+                }
+              },
+              {
+                "position": 5,
+                "title": "Five",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009004"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000302",
+        "title": "Fixture Edition Album (Deluxe Edition)",
+        "score": 100,
+        "date": "2019-05-01",
+        "country": "IN",
+        "status": "Official",
+        "artist-credit": [
+          {
+            "name": "Edition Artist",
+            "artist": {
+              "id": "00000000-0000-4000-8000-000000000504",
+              "name": "Edition Artist"
+            }
+          }
+        ],
+        "release-group": {
+          "id": "00000000-0000-4000-8000-000000000021",
+          "primary-type": "Album"
+        },
+        "text-representation": {
+          "language": "eng",
+          "script": "Latn"
+        },
+        "media": [
+          {
+            "position": 1,
+            "tracks": [
+              {
+                "position": 1,
+                "title": "One",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009000"
+                }
+              },
+              {
+                "position": 2,
+                "title": "Two",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009001"
+                }
+              },
+              {
+                "position": 3,
+                "title": "Three",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009002"
+                }
+              },
+              {
+                "position": 4,
+                "title": "Four",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009003"
+                }
+              },
+              {
+                "position": 5,
+                "title": "Five",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009004"
+                }
+              },
+              {
+                "position": 6,
+                "title": "Bonus",
+                "length": 240000,
+                "recording": {
+                  "id": "00000000-0000-4000-8000-000000009005"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

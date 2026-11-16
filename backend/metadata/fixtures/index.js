@@ -14,7 +14,7 @@ const T2 = ["Ek", "Do", "Teen"];
 const T3 = ["One", "Two", "Three", "Four", "Five"];
 
 const localAlbums = [
-  { id: "fx-1", title: "Fixture Clear Album (Original Motion Picture Soundtrack)", artist: null, year: null, language: "Telugu", tracks: T1.map((t) => ({ title: t, durationSec: 240 })) },
+  { id: "fx-1", title: "Fixture Sparse Album (Original Motion Picture Soundtrack)", artist: null, year: null, language: "Telugu", tracks: T1.map((t) => ({ title: t, durationSec: 240 })) },
   { id: "fx-2", title: "Fixture Ambiguous Film", artist: "Fixture Composer", year: 2020, language: null, tracks: T2.map((t) => ({ title: t, durationSec: 240 })) },
   { id: "fx-3", title: "Fixture Missing Album", artist: "Nobody", year: 2001, language: "Telugu", tracks: [{ title: "Lost", durationSec: 200 }] },
   { id: "fx-4", title: "Fixture Malformed Album", artist: "Someone", year: 2015, language: null, tracks: [{ title: "X", durationSec: 100 }] },
@@ -22,8 +22,8 @@ const localAlbums = [
 ];
 
 const responses = {
-  "Fixture Clear Album (Original Motion Picture Soundtrack)": { releases: [
-    release({ n: 101, rg: 1, title: "Fixture Clear Album", artist: "Fixture Composer", artistN: 501, date: "2018-08-01", lang: "tel", names: T1 }),
+  "Fixture Sparse Album (Original Motion Picture Soundtrack)": { releases: [
+    release({ n: 101, rg: 1, title: "Fixture Sparse Album", artist: "Fixture Composer", artistN: 501, date: "2018-08-01", lang: "tel", names: T1 }),
     release({ n: 102, rg: 2, title: "Unrelated Thing", artist: "Other", artistN: 502, date: "2010", lang: "eng", names: ["Q", "R"] })] },
   "Fixture Ambiguous Film": { releases: [
     release({ n: 201, rg: 11, title: "Fixture Ambiguous Film", artist: "Fixture Composer", artistN: 503, date: "2020-01-01", lang: "tel", names: T2 }),
