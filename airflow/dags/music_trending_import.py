@@ -9,6 +9,7 @@ Timezone: America/New_York
 """
 
 import hashlib
+import os
 import re
 import subprocess
 import sys
@@ -106,10 +107,17 @@ def execute_stage(script_name, **context):
             "Missing import job ID"
         )
 
-    run_script(
-        script_name,
-        ["--job-id", str(int(job_id))],
-    )
+    arguments = ["--job-id", str(int(job_id))]
+
+    # Drive file movement is separately authorized: without this env
+    # var on the worker, archive_drive only performs a dry run.
+    if (
+        script_name == "archive_drive"
+        and os.getenv("MUSICAPP_DRIVE_MOVES_AUTHORIZED") == "1"
+    ):
+        arguments.append("--authorize-drive-moves")
+
+    run_script(script_name, arguments)
 
 
 with DAG(

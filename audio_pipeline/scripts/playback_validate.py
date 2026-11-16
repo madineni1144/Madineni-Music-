@@ -5,10 +5,21 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+import socket
+
 from audio_pipeline.scripts.db import (
     get_connection,
     get_import_job,
+    record_item_error,
 )
+from audio_pipeline.scripts.errors import (
+    AudioFileMissingError,
+    ErrorCategory,
+    ManualReviewError,
+    TransientError,
+    classify_exception,
+)
+from audio_pipeline.scripts.retry_policy import call_with_retries
 
 BASE_URL = os.getenv(
     "MUSICAPP_BASE_URL",
@@ -36,6 +47,11 @@ def get_items(job_id):
                 JOIN songs s ON s.id = i.song_id
                 WHERE i.job_id = %s
                   AND i.status IN ('validated', 'warning')
+                  AND i.playback_validated IS NOT TRUE
+                  AND (
+                        i.next_retry_at IS NULL
+                     OR i.next_retry_at <= NOW()
+                  )
                 ORDER BY i.id
                 """,
                 (job_id,),
@@ -78,61 +94,57 @@ def test_playback(url):
             )
             data = response.read(2)
     except HTTPError as error:
-        raise RuntimeError(
+        if error.code >= 500 or error.code in (408, 429):
+            raise TransientError(
+                f"HTTP {error.code}: {error.reason}"
+            ) from error
+        # 4xx: the published file is not playable. A human decides.
+        raise ManualReviewError(
             f"HTTP {error.code}: {error.reason}"
         ) from error
-    except URLError as error:
-        raise ConnectionError(
-            f"Backend connection failed: {error.reason}"
+    except (URLError, socket.timeout, TimeoutError) as error:
+        raise TransientError(
+            f"Backend connection failed: {getattr(error, 'reason', error)}"
         ) from error
 
     if status != 206:
-        raise RuntimeError(f"Expected HTTP 206, received {status}")
+        raise ManualReviewError(f"Expected HTTP 206, received {status}")
 
     if not content_type.startswith("audio/"):
-        raise RuntimeError(
+        raise ManualReviewError(
             f"Expected audio Content-Type, received {content_type}"
         )
 
     if not content_range.startswith("bytes 0-0/"):
-        raise RuntimeError(
+        raise ManualReviewError(
             f"Invalid Content-Range: {content_range}"
         )
 
     if len(data) != 1:
-        raise RuntimeError(
+        raise ManualReviewError(
             f"Expected one audio byte, received {len(data)}"
         )
 
 
-def save_result(item_id, success, reason=None):
+def save_success(item_id):
+    """Mark playback validated. Playback failures are never written
+    as 'failed': a published song may not be contradicted by a failed
+    import status. Failures go through record_item_error instead."""
     connection = get_connection()
     try:
         with connection.cursor() as cursor:
-            if success:
-                cursor.execute(
-                    """
-                    UPDATE import_items
-                    SET playback_validated = TRUE,
-                        updated_at = NOW()
-                    WHERE id = %s
-                      AND status IN ('validated', 'warning')
-                    """,
-                    (item_id,),
-                )
-            else:
-                cursor.execute(
-                    """
-                    UPDATE import_items
-                    SET playback_validated = FALSE,
-                        status = 'failed',
-                        failure_reason = %s,
-                        updated_at = NOW()
-                    WHERE id = %s
-                      AND status IN ('validated', 'warning')
-                    """,
-                    (reason, item_id),
-                )
+            cursor.execute(
+                """
+                UPDATE import_items
+                SET playback_validated = TRUE,
+                    error_category = NULL,
+                    next_retry_at = NULL,
+                    updated_at = NOW()
+                WHERE id = %s
+                  AND status IN ('validated', 'warning')
+                """,
+                (item_id,),
+            )
 
             if cursor.rowcount != 1:
                 raise RuntimeError(
@@ -188,33 +200,37 @@ def main():
     for item_id, song_id, title, import_path, song_path in items:
         try:
             if Path(import_path).resolve() != Path(song_path).resolve():
-                raise ValueError("Import path and song path differ")
+                raise ManualReviewError("Import path and song path differ")
 
             path = Path(song_path).resolve()
 
             if not path.is_file():
-                raise FileNotFoundError(f"Missing file: {path}")
+                raise AudioFileMissingError(f"Missing file: {path}")
 
             url = build_music_url(song_path)
-            test_playback(url)
-
-        except ConnectionError as error:
-            raise RuntimeError(
-                "Backend connection lost during playback validation; "
-                "remaining songs were not marked failed"
-            ) from error
+            call_with_retries(
+                lambda: test_playback(url),
+                is_transient=lambda e: isinstance(e, TransientError),
+                attempts=3,
+            )
 
         except Exception as error:
-            reason = f"Playback failure: {error}"
-            save_result(item_id, False, reason)
+            category = classify_exception(error)
+
+            if category == ErrorCategory.SYSTEM_ERROR:
+                raise
+
+            reason = f"Playback {category.value}: {error}"
+            record_item_error(item_id, category.value, reason)
             failed += 1
             print(
-                f"[{item_id}] FAILED song_id={song_id}: {reason}",
+                f"[{item_id}] {category.value} song_id={song_id}: "
+                f"{reason}",
                 flush=True,
             )
 
         else:
-            save_result(item_id, True)
+            save_success(item_id)
             passed += 1
             print(
                 f"[{item_id}] PASS song_id={song_id}: {title}",
@@ -222,7 +238,8 @@ def main():
             )
 
     print(
-        f"Playback complete: passed={passed}, failed={failed}",
+        f"Playback complete: passed={passed}, "
+        f"retry_or_review={failed}",
         flush=True,
     )
 

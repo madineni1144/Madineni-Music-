@@ -2,10 +2,21 @@ from pathlib import Path
 import argparse
 import hashlib
 
+from audio_pipeline.scripts.album_policy import (
+    AMBIGUOUS,
+    REUSE,
+    choose_album,
+)
 from audio_pipeline.scripts.db import (
     get_connection,
     get_import_job,
-    mark_import_item_failed,
+    record_item_error,
+)
+from audio_pipeline.scripts.errors import (
+    AmbiguousAlbumError,
+    ErrorCategory,
+    ManualReviewError,
+    classify_exception,
 )
 
 MUSIC_ROOT = Path("/opt/musicapp/music/Songs").resolve()
@@ -63,7 +74,7 @@ def validate_item(item):
         raise ValueError(f"Unsupported audio format: {path.suffix}")
 
     if sha256_file(path) != expected_hash.lower():
-        raise ValueError(f"SHA-256 mismatch: {path}")
+        raise ManualReviewError(f"SHA-256 mismatch: {path}")
 
     return path
 
@@ -88,26 +99,43 @@ def get_or_create_artist(cursor, name):
     return cursor.fetchone()[0]
 
 
-def get_or_create_album(cursor, title):
+def get_or_create_album(cursor, title, artist_id):
+    """Reuse an album only when title AND artist match.
+
+    Existing albums are never modified. Same-title albums that belong
+    to another artist are left alone and a new album is created.
+    Same-title albums with no recorded artist are ambiguous and are
+    sent to manual review instead of being merged.
+    """
     cursor.execute(
         """
-        SELECT id FROM albums
+        SELECT id, title, artist_id FROM albums
         WHERE LOWER(TRIM(title)) = LOWER(TRIM(%s))
-        ORDER BY id LIMIT 1
+        ORDER BY id
         """,
         (title,),
     )
-    row = cursor.fetchone()
-    if row:
-        return row[0]
+    candidates = cursor.fetchall()
+
+    decision, album_id = choose_album(candidates, title, artist_id)
+
+    if decision == REUSE:
+        return album_id
+
+    if decision == AMBIGUOUS:
+        raise AmbiguousAlbumError(
+            f"Album '{title}' is ambiguous for this artist "
+            "(existing album with no artist or duplicates). "
+            "Manual review required; nothing was merged."
+        )
 
     cursor.execute(
         """
         INSERT INTO albums (title, artist_id, year, cover_path)
-        VALUES (%s, NULL, NULL, NULL)
+        VALUES (%s, %s, NULL, NULL)
         RETURNING id
         """,
-        (title,),
+        (title, artist_id),
     )
     return cursor.fetchone()[0]
 
@@ -132,7 +160,7 @@ def register_one(item):
             current = cursor.fetchone()
 
             if not current or current[1] not in ("validated", "warning"):
-                raise RuntimeError("Import item is no longer eligible")
+                raise ManualReviewError("Import item is no longer eligible")
 
             if current[0] is not None:
                 cursor.execute(
@@ -142,7 +170,7 @@ def register_one(item):
                 existing = cursor.fetchone()
 
                 if not existing or Path(existing[0]).resolve() != path:
-                    raise RuntimeError("Linked song path mismatch")
+                    raise ManualReviewError("Linked song path mismatch")
 
                 connection.commit()
                 return current[0], "already linked"
@@ -158,7 +186,7 @@ def register_one(item):
                 action = "reused"
             else:
                 artist_id = get_or_create_artist(cursor, artist)
-                album_id = get_or_create_album(cursor, album)
+                album_id = get_or_create_album(cursor, album, artist_id)
 
                 cursor.execute(
                     """
@@ -189,7 +217,7 @@ def register_one(item):
             )
 
             if cursor.rowcount != 1:
-                raise RuntimeError("Could not link import item")
+                raise ManualReviewError("Could not link import item")
 
         connection.commit()
         return song_id, action
@@ -234,17 +262,22 @@ def main():
                 reused += 1
 
         except Exception as error:
-            failed += 1
-            reason = f"Registration failure: {error}"
+            category = classify_exception(error)
 
-            print(f"[{item_id}] FAILED: {reason}", flush=True)
+            if category == ErrorCategory.SYSTEM_ERROR:
+                raise
+
+            failed += 1
+            reason = f"Registration {category.value}: {error}"
+
+            print(f"[{item_id}] {reason}", flush=True)
 
             try:
-                mark_import_item_failed(item_id, reason)
+                record_item_error(item_id, category.value, reason)
             except Exception as db_error:
                 unrecorded += 1
                 print(
-                    f"[{item_id}] FAILURE STATUS UPDATE ERROR: "
+                    f"[{item_id}] ERROR STATUS UPDATE ERROR: "
                     f"{db_error}",
                     flush=True,
                 )

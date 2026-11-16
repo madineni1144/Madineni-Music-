@@ -9,7 +9,12 @@ from pathlib import Path
 from audio_pipeline.scripts.db import (
     get_connection,
     get_import_job,
-    mark_import_item_failed,
+    record_item_error,
+)
+from audio_pipeline.scripts.errors import (
+    ErrorCategory,
+    ManualReviewError,
+    classify_exception,
 )
 
 MUSIC_ROOT = Path("/opt/musicapp/music/Songs")
@@ -67,7 +72,7 @@ def update_path(item_id, path):
                 (str(path), item_id),
             )
             if cursor.rowcount != 1:
-                raise RuntimeError("Import item path update failed")
+                raise ManualReviewError("Import item path update failed")
         connection.commit()
     except Exception:
         connection.rollback()
@@ -124,7 +129,7 @@ def store_item(item):
         raise FileNotFoundError(f"Source missing: {source}")
 
     if sha256_file(source) != expected:
-        raise RuntimeError("Source SHA-256 mismatch")
+        raise ManualReviewError("Source SHA-256 mismatch")
 
     folder.mkdir(parents=True, exist_ok=True)
     destination = choose_destination(folder, title, suffix, expected)
@@ -145,7 +150,7 @@ def store_item(item):
         shutil.copy2(source, temporary)
 
         if sha256_file(temporary) != expected:
-            raise RuntimeError("Copied audio SHA-256 mismatch")
+            raise ManualReviewError("Copied audio SHA-256 mismatch")
 
         # Exclusive creation prevents replacing an existing file.
         try:
@@ -192,12 +197,18 @@ def main():
                 reused += 1
 
         except Exception as error:
+            category = classify_exception(error)
+
+            if category == ErrorCategory.SYSTEM_ERROR:
+                # Infrastructure/unknown problem: halt, change no item.
+                raise
+
             failed += 1
-            reason = f"Storage failure: {error}"
-            print(f"[{item_id}] FAILED: {reason}", flush=True)
+            reason = f"Storage {category.value}: {error}"
+            print(f"[{item_id}] {reason}", flush=True)
 
             try:
-                mark_import_item_failed(item_id, reason)
+                record_item_error(item_id, category.value, reason)
             except Exception as db_error:
                 unrecorded += 1
                 print(
