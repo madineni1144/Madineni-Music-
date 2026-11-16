@@ -52,3 +52,7 @@ venv/
 **/index.stable-working.html
 **/index.working-*.html
 *.save
+
+# Synthetic test schema only (no data): the one place .sql files are tracked.
+!backend/test/fixtures/
+!backend/test/fixtures/db-test-schema.sql

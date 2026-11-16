@@ -46,6 +46,57 @@ jobs:
           fi
           grep -E "^# (tests|pass|fail|skipped|todo)" test-output.txt
 
+  backend-integration:
+    # Make this job a REQUIRED status check on main (Settings -> Branches).
+    name: backend integration (disposable PostgreSQL, synthetic data only)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust   # throwaway container on the runner network: no password exists to leak
+          POSTGRES_DB: musicapp_test_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d musicapp_test_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Run integration tests
+        working-directory: backend
+        shell: bash
+        env:
+          MUSICAPP_ALLOW_BLOCKED_ROUTE_TESTS: ""   # never allowed in CI
+          MUSICAPP_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/musicapp_test_ci
+        run: |
+          set -o pipefail
+          npm run test:integration 2>&1 | tee integration-output.txt
+      - name: Preserve test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-integration-output
+          path: backend/integration-output.txt
+          if-no-files-found: warn
+      - name: Fail on skipped/todo tests or a suspiciously small run
+        working-directory: backend
+        run: |
+          if grep -E "# (SKIP|TODO)" integration-output.txt; then
+            echo "Skipped/todo integration tests are not allowed in CI."; exit 1
+          fi
+          grep -E "^# (tests|pass|fail|skipped|todo)" integration-output.txt
+          tests=$(grep -E "^# tests " integration-output.txt | awk '{print $3}')
+          pass=$(grep -E "^# pass " integration-output.txt | awk '{print $3}')
+          test "${tests:-0}" -ge 9 && test "$tests" = "$pass"
+
   gate-self-test:
     name: CI gate self-test (a failing command piped through tee must fail its step)
     runs-on: ubuntu-latest

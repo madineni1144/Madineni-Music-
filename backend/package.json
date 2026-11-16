@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --no-warnings --test \"test/*.test.js\"",
+    "test:integration": "node --no-warnings --test \"test/integration/*.test.js\"",
     "test:blocked": "MUSICAPP_ALLOW_BLOCKED_ROUTE_TESTS=1 node --no-warnings --test \"test/*.test.js\""
   },
   "dependencies": {
