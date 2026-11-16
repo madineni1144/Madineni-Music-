@@ -210,3 +210,8 @@ backend; never leave old pages on the new API.
 
 Rolling back files never changes data: the new code adds no tables, columns or rows (the lyrics table is
 created by existing startup code, unchanged).
+
+### Metadata investigation modules (development only; NOT part of any deployment yet)
+
+Runtime-adjacent files added on `feat/metadata-investigation`. They are not loaded by `server.js`, need no migration, and write nothing to the database.
+`backend/metadata/errors.js`, `http-provider.js`, `musicbrainz.js`, `matcher.js`, `report.js`, `agent-tools.js`, `artwork-mock.js`, `fixtures/index.js`; CLI `scripts/metadata-investigate.js`.

@@ -129,4 +129,4 @@ function recordPayload(songId, row) {
     retry_after:row.expires_at || null,
   };
 }
-module.exports = {clean, normalize, metadata, fingerprint, matchScore, pickMatch, parseLrc, recordPayload};
+module.exports = {clean, normalize, titleKey, albumKey, artists, known, metadata, fingerprint, matchScore, pickMatch, parseLrc, recordPayload};
