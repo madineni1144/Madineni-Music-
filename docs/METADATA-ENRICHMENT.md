@@ -19,7 +19,7 @@ Ingestion (legacy + v2) stays paused. External artwork verification stays disabl
 
 ## 2. Gap table (public-apis used as discovery only)
 
-**This comparison is INCOMPLETE.** The public-apis README (Music and MCP Servers sections) could not be fetched in two sessions (hosts not on the fetch allowlist), so those sections were **not** reviewed and no catalogue-derived candidate is excluded or included on that basis. Re-do this step when access exists. Providers were taken from your brief and verified individually through search results from their own docs/terms where available.
+Catalogue reviewed directly: public-apis commit `d6dab92`, section **Music** (37 entries) and section **MCP Servers** (53 entries); see section 2b. Candidate facts below come from each provider's own docs/terms where they could be read; items not read are marked.
 
 | Existing capability | Verified gap | Candidate provider | Required development | Cost/access | Priority |
 |---|---|---|---|---|---|
@@ -31,6 +31,18 @@ Ingestion (legacy + v2) stays paused. External artwork verification stays disabl
 | None | Listening history/recs | ListenBrainz | Needs user tokens + product decision | Free; token auth; rate-limit headers | P3 |
 | None | Radio/concerts | Radio Browser, Bandsintown, Songkick | Skip | Bandsintown only for artists or their representatives with written consent; Songkick reported not granting new keys | Not justified |
 | Discogs | Indian release coverage unknown | Discogs | Defer until MB coverage measured | Auth 60/min; some data restricted by API terms | P2 |
+
+### 2b. public-apis review (commit d6dab92)
+
+- **MCP Servers (53 entries): nothing usable.** The only music-adjacent entry is Kuro (AI image/video/voice/music *generation*), which is unrelated to metadata, and we never present generated media as authentic metadata or lyrics. No MCP server for MusicBrainz, Discogs, Last.fm or lyrics is listed.
+- **Music (37 entries), classified against our gaps:**
+  - Selected/considered from your list (all present in the catalogue): MusicBrainz (no auth), iTunes Search (no auth), Discogs (OAuth), TheAudioDB (apiKey), LastFm (apiKey), ListenBrainz (no auth), Musixmatch (apiKey), Radio Browser (no auth), Bandsintown (listed "No" auth; its own help page restricts access, so unresolved), Songkick (apiKey; access reportedly closed, unverified).
+  - **Songlink/Odesli: catalogue lists `apiKey`, but the real access terms were never read from an official page. Still UNVERIFIED and EXCLUDED from all decisions.**
+  - **Newly noticed, not adopted:** JioSaavn and Gaana entries link to *unofficial* GitHub wrappers (no auth). They target Indian catalogues (potentially Telugu) but are scrapers of commercial services; using them raises terms-of-service and reliability risks. Flagged for a legal/product decision only; no code written.
+  - Streaming catalogues with OAuth (Spotify, Deezer, Napster, KKBOX, SoundCloud, Audiomack, 7digital, Bandcamp): not evaluated against official terms (artwork/metadata reuse and caching rules unknown); deferred.
+  - Lyrics sources (Genius, Lyrics.ovh, KSoft.Si, Vagalume, Musixmatch): not adopted; rights unverified and our rule is retrieval only, never generation.
+  - Generation/tools/other (AI Mastering, Daydream, StemConsole, Sunor, Genrenator, Freesound, Jamendo, Mixcloud, Open Guitar Chords, Openwhyd, Phishin, Songsterr, TasteDive, Verome): not relevant to a verified gap.
+- Net effect: no change to the build decision (MusicBrainz first). The comparison is now **complete as a catalogue review**, but provider terms for the deferred items were not read.
 
 Telugu/Indian coverage: MusicBrainz does hold Telugu soundtrack releases and release groups (spot-found via search), but coverage completeness is **unmeasured**. Run the sample against real albums before relying on it.
 
