@@ -328,8 +328,12 @@ def main():
                 destination
             )
 
+            # Duplicate only if the same content was really imported
+            # (or is in flight in this job). Earlier failed attempts do
+            # not count, so they can be imported again.
             previous = find_duplicate_by_sha256(
-                sha256
+                sha256,
+                job_id=job_id,
             )
 
             status = (
@@ -338,14 +342,24 @@ def main():
                 else "pending"
             )
 
-            created_id = create_import_item(
-                job_id=job_id,
-                drive_file_id=file_id,
-                original_filename=filename,
-                sha256=sha256,
-                local_file_path=str(destination),
-                status=status,
-            )
+            try:
+                created_id = create_import_item(
+                    job_id=job_id,
+                    drive_file_id=file_id,
+                    original_filename=filename,
+                    sha256=sha256,
+                    local_file_path=str(destination),
+                    status=status,
+                )
+            except Exception as insert_error:
+                # Database uniqueness protection (drive_file_id /
+                # imported sha256): a concurrent or repeated run already
+                # tracked this file. Safe to skip; not a failure.
+                if type(insert_error).__name__ == "UniqueViolation":
+                    skipped += 1
+                    print("Already tracked (unique constraint).")
+                    continue
+                raise
 
             if status == "duplicate":
                 duplicates += 1
