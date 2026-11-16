@@ -199,7 +199,9 @@ test("missing artist/tracks/duration evidence lowers confidence and prevents 'cl
 });
 
 test("Telugu script: identical titles match; different words never collide; transliteration is not guessed", () => {
-  assert.equal(lcore.normalize("గీత"), "గ త", "documents that lyrics-core.normalize splits Telugu words at vowel signs; the matcher avoids it");
+  // Asserts the matcher's own behaviour only, so it holds whatever lyrics-core.normalize does with Telugu marks.
+  const single = matchAlbum(loc({ title: "గీత", tracks: [], artist: null }), [cand({ title: "గీత", artists: [], tracks: [] })]);
+  assert.equal(single.best.evidence.title, 1, "a one-word Telugu title with vowel signs matches itself exactly");
   const t = (title) => ({ title, tracks: [], artist: null });
   const same = matchAlbum(loc({ title: "గీత గోవిందం", tracks: [], artist: null }), [cand({ title: "గీత గోవిందం", artists: [], tracks: [] })]);
   assert.equal(same.best.evidence.title, 1);
