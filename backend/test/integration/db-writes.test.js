@@ -136,7 +136,7 @@ test("unauthorised writes change nothing in the database", opts, async () => {
   await withServer(async ({ base, snap }) => {
     const before = await snap();
     const attempts = [
-      ["no credentials", {}, 401, undefined],
+      ["no credentials (over HTTPS)", { ...HTTPS }, 401, undefined],
       ["wrong token", { Authorization: `Bearer ${WRONG}`, ...HTTPS }, 401, undefined],
       ["wrong scheme (Basic)", { Authorization: `Basic ${TOKEN}`, ...HTTPS }, 401, undefined],
       ["token only in the query string", { ...HTTPS }, 401, `?token=${TOKEN}`],
