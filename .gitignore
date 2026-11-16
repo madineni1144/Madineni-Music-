@@ -21,6 +21,7 @@ venv/
 *.sql
 !database/schema.sql
 !database/migrations/*.sql
+!scripts/inspect_live_db.sql
 *.dump
 *.backup
 *.sqlite*
