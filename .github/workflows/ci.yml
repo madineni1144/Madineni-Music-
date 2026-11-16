@@ -95,7 +95,7 @@ jobs:
           grep -E "^# (tests|pass|fail|skipped|todo)" integration-output.txt
           tests=$(grep -E "^# tests " integration-output.txt | awk '{print $3}')
           pass=$(grep -E "^# pass " integration-output.txt | awk '{print $3}')
-          test "${tests:-0}" -ge 8 && test "$tests" = "$pass"
+          test "${tests:-0}" -ge 9 && test "$tests" = "$pass"
 
   gate-self-test:
     name: CI gate self-test (a failing command piped through tee must fail its step)

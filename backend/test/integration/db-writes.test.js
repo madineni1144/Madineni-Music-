@@ -303,3 +303,31 @@ test("concurrent identical adds create exactly one link and no server error", op
     assert.deepEqual(await links(pool, 3), [3]);
   });
 });
+
+test("the write token never appears in server log output or in any response body", opts, async () => {
+  const captured = [];
+  const original = {};
+  for (const level of ["log", "info", "warn", "error", "debug"]) {
+    original[level] = console[level];
+    console[level] = (...args) => captured.push(args.map(String).join(" "));
+  }
+  const bodies = [];
+  try {
+    await withServer(async ({ base, pool }) => {
+      // Force a database error on one route so an error log line is produced.
+      await pool.query(`CREATE FUNCTION synthetic_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic failure marker'; END $$`);
+      await pool.query(`CREATE TRIGGER synthetic_fail_delete BEFORE DELETE ON playlists FOR EACH ROW WHEN (OLD.id = 1) EXECUTE FUNCTION synthetic_fail()`);
+      for (const headers of [authed, { Authorization: `Bearer ${WRONG}`, ...HTTPS }, { ...HTTPS }, { Authorization: `Bearer ${TOKEN}` }]) {
+        for (const [method, path, body] of WRITES) {
+          bodies.push(await (await call(base, method, path, body, headers)).text());
+        }
+      }
+    });
+  } finally {
+    for (const level of Object.keys(original)) console[level] = original[level];
+  }
+  assert.ok(captured.some((line) => line.includes("synthetic failure marker")), "the capture must have seen the forced error log, otherwise this test proves nothing");
+  const everything = captured.concat(bodies).join("\n");
+  assert.equal(everything.includes(TOKEN), false, "the valid token leaked into a log line or response");
+  assert.equal(everything.includes(WRONG), false, "a submitted token leaked into a log line or response");
+});
