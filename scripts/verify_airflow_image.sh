@@ -56,10 +56,16 @@ docker run --rm --network none --entrypoint ffprobe "$IMAGE" -version | head -1
 docker run --rm --network none --entrypoint ffmpeg  "$IMAGE" -version | head -1
 
 echo "== every pipeline script imports cleanly (no main(), no connections) =="
-docker run --rm -i --network none -v "$REPO":/src:ro -e PYTHONPATH=/src --entrypoint python "$IMAGE" -B -I - <<'PY'
+# NOTE: python -I (isolated mode) ignores PYTHONPATH, so passing -e PYTHONPATH=/src made every import fail with
+# "No module named 'audio_pipeline'" even though the image was fine. Put the mounted repo on sys.path explicitly.
+docker run --rm -i --network none -v "$REPO":/src:ro --entrypoint python "$IMAGE" -B -I - <<'PY'
 import importlib, pathlib, sys
+sys.path.insert(0, "/src")
 failed = []
-for path in sorted(pathlib.Path("/src/audio_pipeline/scripts").glob("*.py")):
+paths = sorted(pathlib.Path("/src/audio_pipeline/scripts").glob("*.py"))
+if not paths:
+    print("FAIL no pipeline scripts found under /src/audio_pipeline/scripts"); sys.exit(1)
+for path in paths:
     name = f"audio_pipeline.scripts.{path.stem}"
     try:
         importlib.import_module(name)
@@ -68,5 +74,28 @@ for path in sorted(pathlib.Path("/src/audio_pipeline/scripts").glob("*.py")):
         failed.append(name)
         print("FAIL", name, f"{type(exc).__name__}: {exc}")
 sys.exit(1 if failed else 0)
+PY
+
+echo "== DAG loads with no import errors (DagBag only; scheduler/webserver never start) =="
+docker run --rm -i --network none -v "$REPO":/src:ro -e AIRFLOW__CORE__LOAD_EXAMPLES=False \
+  --entrypoint python "$IMAGE" -B -I - <<'PY'
+import sys
+sys.path.insert(0, "/src")
+try:
+    from airflow.dag_processing.dagbag import DagBag
+except ImportError:
+    from airflow.models.dagbag import DagBag
+bag = DagBag(dag_folder="/src/airflow/dags", include_examples=False)
+if bag.import_errors:
+    for path, err in bag.import_errors.items():
+        print("IMPORT ERROR", path, str(err).splitlines()[-1] if str(err) else "")
+    sys.exit(1)
+ids = sorted(bag.dags)
+print("dags:", ids)
+if "madineni_audio_pipeline" not in ids:
+    print("FAIL expected DAG madineni_audio_pipeline not loaded"); sys.exit(1)
+dag = bag.dags["madineni_audio_pipeline"]
+print("tasks:", sorted(t.task_id for t in dag.tasks))
+sys.exit(0 if dag.tasks else 1)
 PY
 echo "ALL CHECKS PASSED for $IMAGE"
