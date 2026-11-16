@@ -146,6 +146,15 @@ Consequences and assumptions to confirm in step 0:
   depend on that; it has **not** been verified against your actual tunnel.
 - `CF-Connecting-IP` is used only as the rate-limit key and only from a trusted peer.
 
+### Client-identity limits that remain (read before relying on the lockout)
+
+Verified by `backend/test/client-ip-evasion.test.js` with the production limits (10 failures / 15 min / client, 200 global):
+- A direct (non-loopback) client cannot change its lockout key with `CF-Connecting-IP`, `X-Forwarded-For`, `X-Real-IP`, `Forwarded` or `True-Client-IP`; in `none` mode the headers are ignored even from loopback.
+- Remaining limits (not fixed here, no limits were weakened or raised):
+  1. In `cloudflare` mode a trusted peer's `CF-Connecting-IP` is believed. The origin must be reachable ONLY through cloudflared/the trusted proxy; any other loopback hop (e.g. nginx) must overwrite/forward Cloudflare's header and never pass a client-supplied one, or an attacker can mint identities.
+  2. The key is the exact address, so an attacker with an IPv6 /64 can rotate addresses. Bucketing IPv6 to /64 is a possible follow-up.
+  3. The global ceiling only changes the answer to failing requests (429); it deliberately never blocks a correct token, so guessing is bounded by token entropy (>= 32 chars required), not by the limiter.
+
 ## 4. Order of deployment (after approval)
 
 1. **Back up** (code and config only; do not copy music, covers or database): `tar` the live backend dir,
