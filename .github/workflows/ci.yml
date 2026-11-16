@@ -25,9 +25,19 @@ jobs:
         run: npm ci
       - name: Run tests
         working-directory: backend
+        shell: bash   # GitHub's bash shell runs with -eo pipefail, so a failing npm test fails the step through tee
         env:
           MUSICAPP_ALLOW_BLOCKED_ROUTE_TESTS: ""   # never allowed in CI
-        run: npm test 2>&1 | tee test-output.txt
+        run: |
+          set -o pipefail   # explicit, in case the shell default ever changes
+          npm test 2>&1 | tee test-output.txt
+      - name: Preserve test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-output
+          path: backend/test-output.txt
+          if-no-files-found: warn
       - name: Fail if any test was skipped or marked todo
         working-directory: backend
         run: |
@@ -35,6 +45,27 @@ jobs:
             echo "Skipped/todo tests are not allowed in CI (security tests must execute)."; exit 1
           fi
           grep -E "^# (tests|pass|fail|skipped|todo)" test-output.txt
+
+  gate-self-test:
+    name: CI gate self-test (a failing command piped through tee must fail its step)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Controlled failing command (expected to fail)
+        id: controlled
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          sh -c 'echo "controlled failure"; exit 1' 2>&1 | tee controlled.txt
+      - name: Assert the failure propagated
+        run: |
+          echo "controlled step outcome: ${{ steps.controlled.outcome }}"
+          test "${{ steps.controlled.outcome }}" = "failure"
+          grep -q "controlled failure" controlled.txt   # the log was still captured
+      - name: Show that the old pattern (no pipefail) would have hidden it
+        shell: sh   # sh has no pipefail here: demonstrates the defect that was fixed
+        run: |
+          if sh -c 'sh -c "exit 1" | cat'; then echo "old pattern masks failures (expected)"; else exit 1; fi
 
   pipeline-paths:
     runs-on: ubuntu-latest
