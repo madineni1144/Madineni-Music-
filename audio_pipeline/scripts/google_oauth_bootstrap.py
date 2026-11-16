@@ -1,9 +1,14 @@
+import os
 from pathlib import Path
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-CLIENT_SECRET_FILE = Path("/home/rk/google_oauth.json")
-TOKEN_FILE = Path("/home/rk/google_drive_token.json")
+CLIENT_SECRET_FILE = Path(
+    os.getenv("GOOGLE_OAUTH_CLIENT_FILE", "/home/rk/google_oauth.json")
+)
+TOKEN_FILE = Path(
+    os.getenv("GOOGLE_DRIVE_TOKEN_FILE", "/home/rk/google_drive_token.json")
+)
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 

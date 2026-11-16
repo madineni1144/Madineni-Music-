@@ -233,6 +233,7 @@ function createService(pool,options={}) {
   }
   return {get,ready};
 }
+function denyWrites(req,res){return res.status(503).json({success:false,code:'WRITE_AUTH_UNAVAILABLE',error:'Write operations are disabled: server authentication is not configured'});}
 function mount(app,pool,options={}) {
   const service=createService(pool,options);
   app.get('/api/lyrics/player.js',(req,res)=>{
@@ -245,7 +246,11 @@ function mount(app,pool,options={}) {
       res.set('Cache-Control','no-store').json({success:true,version:VERSION,provider:'LRCLIB',storage:'PostgreSQL',counts:Object.fromEntries(results.rows.map(x=>[x.status,x.count]))});
     }catch {res.status(503).json({success:false,error:'Lyrics database unavailable'});}
   });
-  app.get('/api/songs/:id/lyrics',async(req,res)=>{
+  // Plain reads stay open. An explicit refresh bypasses the cache (provider lookup + DB write),
+  // so it must pass the refresh guard; it fails closed when none is supplied.
+  const wantsRefresh=req=>req.query.refresh==='1'||req.query.refresh==='true';
+  const refreshGuard=options.refreshGuard||denyWrites;
+  app.get('/api/songs/:id/lyrics',(req,res,next)=>wantsRefresh(req)?refreshGuard(req,res,next):next(),async(req,res)=>{
     const id=String(req.params.id);
     if(!/^[1-9]\d{0,18}$/.test(id) || BigInt(id)>9223372036854775807n)return res.status(400).json({success:false,error:'Invalid song ID'});
     const refresh = req.query.refresh === '1' || req.query.refresh === 'true';
@@ -255,12 +260,13 @@ function mount(app,pool,options={}) {
       res.set('Retry-After',String(error.retrySeconds||5)).status(503).json({success:false,error:'Lyrics temporarily unavailable. Please try again later.'});
     }
   });
-  app.post('/api/songs/:id/lyrics',async(req,res)=>{
+  app.post('/api/songs/:id/lyrics',options.writeGuard||denyWrites,async(req,res)=>{
     const id=String(req.params.id);
     if(!/^[1-9]\d{0,18}$/.test(id))return res.status(400).json({success:false,error:'Invalid song ID'});
     const plain=typeof req.body?.plainLyrics==='string'?req.body.plainLyrics.trim():null;
     const synced=typeof req.body?.syncedLyrics==='string'?req.body.syncedLyrics.trim():null;
     if(!plain && !synced)return res.status(400).json({success:false,error:'Plain or synced lyrics text is required'});
+    if(Buffer.byteLength(plain||'')>MAX_LYRICS_BYTES||Buffer.byteLength(synced||'')>MAX_LYRICS_BYTES)return res.status(413).json({success:false,error:'Lyrics text is too large'});
     try {
       await service.ready;
       const found=await pool.query(SONG_SQL,[id]);
@@ -278,7 +284,8 @@ function mount(app,pool,options={}) {
         [id,fp,plain,synced]);
       res.json({success:true,data:core.recordPayload(id,saved.rows[0])});
     }catch(err){
-      res.status(500).json({success:false,error:err.message});
+      console.error('Manual lyrics save error:',err.message);
+      res.status(500).json({success:false,error:'Unable to save lyrics'});
     }
   });
   return service;

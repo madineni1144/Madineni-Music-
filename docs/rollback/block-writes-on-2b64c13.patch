@@ -1,0 +1,21 @@
+diff --git a/backend/server.js b/backend/server.js
+index c45d763..ba3fbff 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -14,6 +14,16 @@ const COVERS_DIR = "/opt/musicapp/covers";
+ app.use(cors());
+ app.use(express.json());
+ 
++// ROLLBACK GUARD: this build predates write authentication. Refuse every request that could
++// change data, plus explicit lyrics refresh (provider lookup + database write). Remove only after
++// deploying the authenticated build.
++app.use((req, res, next) => {
++  const reading = req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS";
++  const refresh = req.query && (req.query.refresh === "1" || req.query.refresh === "true");
++  if (reading && !refresh) return next();
++  res.status(503).json({ success: false, code: "WRITES_DISABLED", error: "Write operations are disabled" });
++});
++
+ app.use(express.static(FRONTEND_DIR));
+ app.use("/music", express.static(MUSIC_DIR));
+ app.use("/covers", express.static(COVERS_DIR));

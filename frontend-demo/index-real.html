@@ -135,9 +135,10 @@ function search(q){q=q.trim().toLowerCase();const found=data.filter(s=>`${s.titl
 $("globalSearch").onkeydown=e=>{if(e.key==="Enter")search(e.target.value)};$("mobileSearch").onclick=()=>{const q=prompt("Search songs, albums or artists");if(q!==null){$("globalSearch").value=q;search(q)}};
 document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{c.parentElement.querySelectorAll(".chip").forEach(x=>x.classList.remove("active"));c.classList.add("active")});
 
+async function fetchAllSongs(){const size=500,all=[];for(let guard=0;guard<10000;guard++){const r=await fetch(`${SONGS_API}?limit=${size}&offset=${all.length}`);if(!r.ok)throw new Error(`API ${r.status}`);const rows=await r.json();if(!Array.isArray(rows))throw new Error("Unexpected songs response");if(!rows.length)return all;all.push(...rows)}throw new Error("Song list did not finish loading")}
 async function init(){
   $("quick").innerHTML='<p class="status">Loading your music library…</p>';
-  try{const r=await fetch(SONGS_API);if(!r.ok)throw new Error(`API ${r.status}`);data=await r.json();if(!Array.isArray(data)||!data.length)throw new Error("No songs returned");render();await select(0,false);}
+  try{data=await fetchAllSongs();if(!Array.isArray(data)||!data.length)throw new Error("No songs returned");render();await select(0,false);}
   catch(e){console.error(e);$("quick").innerHTML=`<p class="status error">Could not load songs from ${esc(SONGS_API)}. ${esc(e.message)}</p>`}
 }
 init();

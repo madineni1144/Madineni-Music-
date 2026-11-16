@@ -1,40 +1,82 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const { Pool } = require("pg");
-require("dotenv").config({ path: "/opt/musicapp/app/config/.env" });
+const { loadConfig } = require("./config");
+const {
+  parsePagination,
+  requireWriteAuth,
+  refreshThrottle,
+  chain,
+  buildCorsOptions,
+  jsonErrorHandler
+} = require("./http-utils");
+const { buildSongsQuery } = require("./songs-query");
+const { createProxyTrust } = require("./proxy");
+const { createRateLimiter } = require("./rate-limit");
+const { deletePlaylist } = require("./playlist-store");
+
+/**
+ * Build the Express app. The database pool and configuration are injected so
+ * the routes can be tested without a live database.
+ */
+function createApp({ pool, config, lyricsOptions = {} }) {
 
 const app = express();
+app.disable("x-powered-by");
 
-const PORT = 3000;
-const FRONTEND_DIR = "/opt/musicapp/app/frontend";
-const MUSIC_DIR = "/opt/musicapp/music/Songs";
-const COVERS_DIR = "/opt/musicapp/covers";
+// Forwarded headers are never trusted via Express "trust proxy"; see proxy.js.
+const proxy = createProxyTrust({
+  mode: config.proxyMode,
+  trustedProxies: config.trustedProxies
+});
 
-app.use(cors());
-app.use(express.json());
+const FRONTEND_DIR = config.frontendDir;
+const MUSIC_DIR = config.musicDir;
+const COVERS_DIR = config.coversDir;
+const EXPOSE_ERROR_DETAILS = config.exposeErrorDetails;
+
+// Fail-closed: without a valid MUSICAPP_WRITE_TOKEN every write route answers 503.
+const writeGuard = requireWriteAuth({
+  token: config.writeToken,
+  configured: config.writeAuthConfigured,
+  requireHttps: config.requireHttps,
+  isSecure: proxy.isSecure,
+  clientIp: proxy.clientIp,
+  failLimiter: createRateLimiter({ windowMs: config.authFailWindowMs, max: config.authFailMax }),
+  globalFailLimiter: createRateLimiter({
+    windowMs: config.authFailWindowMs,
+    max: config.authFailGlobalMax,
+    maxKeys: 1
+  })
+});
+
+// Explicit lyrics refresh (?refresh=1) costs a provider lookup and a database
+// write: it needs the write token and is throttled per song, client and overall.
+const hour = 60 * 60 * 1000;
+const refreshGuard = chain(
+  writeGuard,
+  refreshThrottle({
+    perSong: createRateLimiter({ windowMs: config.refreshSongCooldownMs, max: 1 }),
+    perClient: createRateLimiter({ windowMs: hour, max: config.refreshPerClientHour }),
+    overall: createRateLimiter({ windowMs: hour, max: config.refreshOverallHour, maxKeys: 1 }),
+    clientIp: proxy.clientIp
+  })
+);
+
+// Only configured origins receive CORS headers. CORS is not authentication.
+app.use(cors(buildCorsOptions(config.corsOrigins)));
+app.use(express.json({ limit: "512kb" }));
 
 app.use(express.static(FRONTEND_DIR));
 app.use("/music", express.static(MUSIC_DIR));
 app.use("/covers", express.static(COVERS_DIR));
-
-const pool = new Pool({
-host: process.env.DB_HOST,
-port: process.env.DB_PORT,
-database: process.env.DB_NAME,
-user: process.env.DB_USER,
-password: process.env.DB_PASSWORD,
-max: 10,
-idleTimeoutMillis: 30000,
-connectionTimeoutMillis: 5000
-});
 
 /* =========================
 ROOT
 ========================= */
 
 // MADINENI LYRICS START
-require("./madineni-lyrics.cjs").mount(app, pool, {musicDir:MUSIC_DIR});
+require("./madineni-lyrics.cjs").mount(app, pool, {musicDir:MUSIC_DIR, ...lyricsOptions, writeGuard, refreshGuard});
 // MADINENI LYRICS END
 
 
@@ -52,15 +94,9 @@ app.get("/api/health", async (req, res) => {
 
 try {
 
-const result =
-  await pool.query("SELECT NOW() AS time");
+await pool.query("SELECT 1");
 
-res.json({
-  success: true,
-  status: "ok",
-  database: "connected",
-  time: result.rows[0].time
-});
+res.json({ success: true, status: "ok" });
 
 } catch (error) {
 
@@ -69,35 +105,20 @@ console.error(
   error.message
 );
 
-res.status(503).json({
-  success: false,
-  status: "error",
-  database: "disconnected",
-  error: error.message
-});
+res.status(503).json({ success: false, status: "error" });
 
 }
 
 });
 
-/* =========================
-DB TEST
-========================= */
-
+// Kept for compatibility; exposes no database name, host or timestamp.
 app.get("/api/db-test", async (req, res) => {
 
 try {
 
-const result =
-  await pool.query(
-    "SELECT NOW() AS current_time"
-  );
+await pool.query("SELECT 1");
 
-res.json({
-  connected: true,
-  database: process.env.DB_NAME,
-  time: result.rows[0].current_time
-});
+res.json({ connected: true });
 
 } catch (error) {
 
@@ -106,10 +127,7 @@ console.error(
   error.message
 );
 
-res.status(500).json({
-  connected: false,
-  error: error.message
-});
+res.status(503).json({ connected: false });
 
 }
 
@@ -138,146 +156,16 @@ const album =
     ? req.query.album.trim()
     : "";
 
-let limit =
-  Number.parseInt(
-    req.query.limit,
-    10
-  );
+const { limit, offset } =
+  parsePagination(req.query, {
+    defaultSize: config.defaultPageSize,
+    maxSize: config.maxPageSize
+  });
 
-let offset =
-  Number.parseInt(
-    req.query.offset,
-    10
-  );
-
-if (
-  !Number.isInteger(limit) ||
-  limit <= 0
-) {
-  limit = 1000000;
-}
-
-if (limit > 1000000) {
-  limit = 1000000;
-}
-
-if (
-  !Number.isInteger(offset) ||
-  offset < 0
-) {
-  offset = 0;
-}
-
-const conditions = [];
-const values = [];
-
-let parameter = 1;
-
-
-if (search !== "") {
-
-  conditions.push(
-    "(" +
-    "songs.title ILIKE $" +
-    parameter +
-    " OR artists.name ILIKE $" +
-    parameter +
-    " OR albums.title ILIKE $" +
-    parameter +
-    ")"
-  );
-
-  values.push(
-    "%" + search + "%"
-  );
-
-  parameter++;
-
-}
-
-
-if (artist !== "") {
-
-  conditions.push(
-    "artists.name ILIKE $" +
-    parameter
-  );
-
-  values.push(
-    "%" + artist + "%"
-  );
-
-  parameter++;
-
-}
-
-
-if (album !== "") {
-
-  conditions.push(
-    "albums.title ILIKE $" +
-    parameter
-  );
-
-  values.push(
-    "%" + album + "%"
-  );
-
-  parameter++;
-
-}
-
-
-const whereClause =
-  conditions.length > 0
-    ? "WHERE " +
-      conditions.join(" AND ")
-    : "";
-
-
-values.push(limit);
-const limitParameter = parameter;
-parameter++;
-
-values.push(offset);
-const offsetParameter = parameter;
-
+const query = buildSongsQuery({ search, artist, album, limit, offset });
 
 const result =
-  await pool.query(
-    `
-    SELECT
-      songs.id,
-      songs.title,
-      songs.artist_id,
-      artists.name AS artist,
-      songs.album_id,
-      albums.title AS album,
-      songs.track_number,
-      songs.duration_seconds,
-      songs.file_path,
-      songs.file_format,
-      songs.file_size,
-      songs.created_at,
-      COALESCE(NULLIF(albums.cover_path, ''), '/covers/' || songs.id || '.jpg') AS cover_art
-
-    FROM songs
-
-    LEFT JOIN artists
-      ON songs.artist_id = artists.id
-
-    LEFT JOIN albums
-      ON songs.album_id = albums.id
-
-    ${whereClause}
-
-    ORDER BY songs.id ASC
-
-    LIMIT $${limitParameter}
-    OFFSET $${offsetParameter}
-    `,
-    values
-  );
+  await pool.query(query.text, query.values);
 
 res.json(result.rows);
 
@@ -290,7 +178,7 @@ console.error(
 
 res.status(500).json({
   error: "Unable to load songs",
-  details: error.message
+  details: EXPOSE_ERROR_DETAILS ? error.message : undefined
 });
 
 }
@@ -319,7 +207,7 @@ res.json({
 
 res.status(500).json({
   success: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -402,7 +290,7 @@ console.error(
 
 res.status(500).json({
   success: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -450,7 +338,7 @@ console.error(
 
 res.status(500).json({
   success: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -512,7 +400,7 @@ console.error(
 
 res.status(500).json({
   success: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -557,7 +445,7 @@ console.error(
 
 res.status(500).json({
   success: false,
-  error: error.message
+  error: EXPOSE_ERROR_DETAILS ? error.message : "Internal server error"
 });
 
 }
@@ -613,7 +501,7 @@ console.error(
 res.status(500).json({
   success: false,
   error: "Unable to load playlists",
-  details: error.message
+  details: EXPOSE_ERROR_DETAILS ? error.message : undefined
 });
 
 }
@@ -624,7 +512,7 @@ res.status(500).json({
 CREATE PLAYLIST
 ========================= */
 
-app.post("/api/playlists", async (req, res) => {
+app.post("/api/playlists", writeGuard, async (req, res) => {
 
 try {
 
@@ -680,7 +568,7 @@ console.error(
 res.status(500).json({
   success: false,
   error: "Unable to create playlist",
-  details: error.message
+  details: EXPOSE_ERROR_DETAILS ? error.message : undefined
 });
 
 }
@@ -757,7 +645,7 @@ try {
   res.status(500).json({
     success: false,
     error: "Unable to load playlist songs",
-    details: error.message
+    details: EXPOSE_ERROR_DETAILS ? error.message : undefined
   });
 
 }
@@ -771,6 +659,7 @@ ADD SONG TO PLAYLIST
 
 app.post(
 "/api/playlists/:id/songs",
+writeGuard,
 async (req, res) => {
 
 try {
@@ -826,6 +715,13 @@ try {
 
 } catch (error) {
 
+  if (error.code === "23503") {
+    return res.status(404).json({
+      success: false,
+      error: "Playlist or song not found"
+    });
+  }
+
   console.error(
     "Add playlist song error:",
     error.message
@@ -835,7 +731,7 @@ try {
     success: false,
     error:
       "Unable to add song to playlist",
-    details: error.message
+    details: EXPOSE_ERROR_DETAILS ? error.message : undefined
   });
 
 }
@@ -849,6 +745,7 @@ REMOVE SONG FROM PLAYLIST
 
 app.delete(
 "/api/playlists/:id/songs/:songId",
+writeGuard,
 async (req, res) => {
 
 try {
@@ -910,7 +807,7 @@ try {
     success: false,
     error:
       "Unable to remove song from playlist",
-    details: error.message
+    details: EXPOSE_ERROR_DETAILS ? error.message : undefined
   });
 
 }
@@ -924,6 +821,7 @@ DELETE PLAYLIST
 
 app.delete(
 "/api/playlists/:id",
+writeGuard,
 async (req, res) => {
 
 try {
@@ -943,28 +841,9 @@ try {
 
   }
 
-  await pool.query(
-    `
-    DELETE FROM playlist_songs
-    WHERE playlist_id = $1
-    `,
-    [playlistId]
-  );
+  const deleted = await deletePlaylist(pool, playlistId);
 
-  const result =
-    await pool.query(
-      `
-      DELETE FROM playlists
-      WHERE id = $1
-
-      RETURNING
-        id,
-        name
-      `,
-      [playlistId]
-    );
-
-  if (!result.rows.length) {
+  if (!deleted) {
 
     return res.status(404).json({
       success: false,
@@ -975,7 +854,7 @@ try {
 
   res.json({
     success: true,
-    data: result.rows[0]
+    data: deleted
   });
 
 } catch (error) {
@@ -989,7 +868,7 @@ try {
     success: false,
     error:
       "Unable to delete playlist",
-    details: error.message
+    details: EXPOSE_ERROR_DETAILS ? error.message : undefined
   });
 
 }
@@ -1011,31 +890,56 @@ path: req.path
 
 });
 
+app.use(jsonErrorHandler(EXPOSE_ERROR_DETAILS));
+
+return app;
+
+}
+
 /* =========================
 SERVER
 ========================= */
 
-app.listen(
-PORT,
-"0.0.0.0",
-() => {
+function start() {
 
-console.log("");
-console.log("======================================");
-console.log("       MUSIC APP API SERVER");
-console.log("======================================");
-console.log("Port:      " + PORT);
-console.log(
-  "Local:     http://127.0.0.1:" + PORT
-);
-console.log(
-  "Wi-Fi:     http://192.168.4.204:" + PORT
-);
-console.log(
-  "Tailscale: http://100.83.79.17:" + PORT
-);
-console.log("======================================");
-console.log("");
+  require("dotenv").config({
+    path: process.env.ENV_FILE || "/opt/musicapp/app/config/.env"
+  });
+
+  const { Pool } = require("pg");
+  const config = loadConfig(process.env);
+
+  if (!config.writeAuthConfigured) {
+    console.warn(
+      "WARNING: MUSICAPP_WRITE_TOKEN is " +
+      (config.writeTokenTooShort ? "shorter than 32 characters" : "not set") +
+      ". Playlist and lyrics write routes are DISABLED (503)."
+    );
+  }
+
+  const pool = new Pool({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000
+  });
+
+  createApp({ pool, config }).listen(
+    config.port,
+    "0.0.0.0",
+    () => {
+      console.log("Music app API listening on port " + config.port);
+    }
+  );
 
 }
-);
+
+if (require.main === module) {
+  start();
+}
+
+module.exports = { createApp };
