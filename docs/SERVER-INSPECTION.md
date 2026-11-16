@@ -9,6 +9,7 @@ database, call any provider or touch ingestion/artwork verification.
 
 | Script | Reads | Never does |
 |---|---|---|
+| `scripts/run_inspection.sh` | orchestrates the three below with explicit checks at every stage | print reports, environment values or credentials; change anything on the server |
 | `scripts/inspect_live_server.sh` | systemd unit properties, process cwd, config variable **names** (presence only; a short allow-list of non-secret settings shown), nginx/cloudflared config lines, sha256 of app files | print secret values or command-line arguments, run `systemctl` mutations, touch the git index, use the network |
 | `scripts/inspect_live_db.sql` | PostgreSQL catalogues and the connecting role's privileges, inside `BEGIN READ ONLY` | read application rows, count rows, write anything |
 | `scripts/inspect_access_logs.sh` | the access-log files you name | print IPs, query strings, tokens, user agents or raw lines |
@@ -16,67 +17,62 @@ database, call any provider or touch ingestion/artwork verification.
 Do not use the earlier version of `inspect_live_server.sh` (commit `0e37cf1`): it could print `--token`
 values, a quoted `DATABASE_URL` password and unrelated environment-file lines.
 
-## 1. Obtain the scripts without touching the live checkout
+## 1. Obtain and verify the four files (live checkout untouched)
 
-Run on the server as any user. This downloads into a new empty directory under `/tmp`; it does not `git pull`,
-and does not read or change the live directory.
+Run on the server. The runner needs the hashes, so create `SHA256SUMS` from the values given in the review
+message for the pinned commit; do not generate them from the downloaded files.
 
 ```bash
-SHA=<PINNED_COMMIT_SHA>        # given in the review message; the repo is public
-D=$(mktemp -d /tmp/inspect.XXXXXX) && cd "$D"
-for f in inspect_live_server.sh inspect_access_logs.sh inspect_live_db.sql; do
-  curl -fsSL -o "$f" "https://raw.githubusercontent.com/madineni1144/Madineni-Music-/$SHA/scripts/$f"
+SHA=<PINNED_COMMIT_SHA>
+D=$(mktemp -d /tmp/inspect.XXXXXX) && cd "$D" || exit 1
+for f in run_inspection.sh inspect_live_server.sh inspect_access_logs.sh inspect_live_db.sql; do
+  curl -fsSL -o "$f" "https://raw.githubusercontent.com/madineni1144/Madineni-Music-/$SHA/scripts/$f" || { echo "DOWNLOAD FAILED: $f"; exit 1; }
 done
-sha256sum *            # compare with the hashes in the review message
-less inspect_live_server.sh   # read it before running
+# paste the four "hash  filename" lines from the review message into SHA256SUMS, then:
+sha256sum -c SHA256SUMS || { echo "CHECKSUM FAILED - stop"; exit 1; }
+less run_inspection.sh        # read it before running
 ```
 
-If a hash differs, stop and do not run anything.
-
-## 2. Server, proxy and version (no root needed; use `sudo` only if some units are not visible)
+## 2. Run the runner
 
 ```bash
-bash inspect_live_server.sh > server-report.txt 2>&1; wc -l server-report.txt; cat server-report.txt
+bash run_inspection.sh                                   # lists candidate units only; picks nothing
+bash run_inspection.sh --service <exact>.service [--log-dir /var/log/nginx]
 ```
 
-It reports: the actual service working directory and running process cwd; whether application files match
-release `2b64c13` or `0e37cf1` (sha256) or neither; git HEAD if the directory is a checkout; configuration
-variable names as present/absent (`MUSICAPP_WRITE_TOKEN` also "length >= 32: yes/no"); proxy settings relevant
-to trusted client IPs and HTTPS (`MUSICAPP_PROXY_MODE`, `MUSICAPP_TRUSTED_PROXIES`, `MUSICAPP_REQUIRE_HTTPS`,
-nginx `set_real_ip_from`, `real_ip_header`, `proxy_set_header`, `listen`, cloudflared ingress); listening
-sockets (address and process name).
+What it does, in order, stopping with a short sanitised error at the first failure (exit codes 2 args/checksum,
+3 service, 4 environment access, 5 connection policy, 6 workdir, 7 server report, 8 database, 9 logs):
 
-Skim `server-report.txt` yourself before sending it; the script masks long token-like strings, but you are the
-final check.
+1. Re-checks `sha256sum -c`.
+2. Verifies the exact unit is loaded, active, running, with a nonzero MainPID that is a live process.
+3. Uses `sudo` for a small helper that opens `/proc/<pid>/environ` itself and emits only non-secret settings
+   (`DB_HOST/PORT/NAME/USER`, the driver's `PG*` fallbacks, `PGSSLMODE`, `PGSSLROOTCERT`; `DATABASE_URL` is parsed inside
+   the helper and only host/port/database/role/sslmode leave it). The environment is never printed or sourced.
+   The checked-in `server.js` reads `DB_*` only, sets no TLS option and does not read `DATABASE_URL`; the runner
+   mirrors that and reports the policy it derived. It refuses to guess: missing host/name/role, `PGSERVICE`, an
+   unparseable URL, or `verify-*` without a readable root certificate all stop the run.
+4. Runs the server report, then one `psql` session (read-only, 5 s statement and 1 s lock timeouts) using the
+   service's own role, host, port and sslmode. The password is never passed by the runner; `psql` prompts or uses
+   your `.pgpass`. The same session's `pg_stat_ssl` row is in `db-report.txt`.
+5. Finds the access logs with null-delimited, quoted filenames, oldest first, and summarises them.
+6. Prints only the **names** of report files that match a secret-like pattern. This is a supplementary aid, not
+   proof; review every report yourself before sending anything.
 
-## 3. Database schema and role privileges (catalogue queries only)
+Reports stay in `/tmp/inspect-reports.XXXXXX` (mode 700) and are never printed. `db-errors.txt` and
+`logs-errors.txt` are for you only: do not send them.
 
-Run as the **same role the application uses**, otherwise the privilege answers are not the app's. The password
-is prompted for; never put it on the command line.
-
-```bash
-PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000' \
-  psql -X -v ON_ERROR_STOP=1 -h <db host> -U <app role> -d <database> -W -f inspect_live_db.sql > db-report.txt
-```
-
-It reports role attributes, whether the six tables exist, SELECT/INSERT/UPDATE/DELETE per table, schema
-CREATE, sequence USAGE, columns, constraints (the playlist routes need unique `(playlist_id, song_id)` and
-foreign keys), indexes, row-level security and triggers. It returns no application data.
-
-## 4. Client compatibility
+## 3. Client compatibility
 
 **iOS source:** not available in this repository or session. If you have the Xcode project, search it for
 `URLRequest`, `httpMethod`, `"PUT"`, `"PATCH"`, `"DELETE"`, `/api/playlists`, `refresh=1`, `limit=` and
 `offset=`; the hardened server needs a bearer token on every write and returns only the default page (100)
 when `limit` is absent. Until then use the logs.
 
-**Logs** (nginx default `access.log` and rotations; list them oldest first):
+**Logs:** the runner already summarises `access.log*` under `--log-dir` (quoted, null-delimited, oldest first). Optional
+coarse client classes (apple-native / browser / script; agents are never printed), for one file:
 
 ```bash
-ls -l /var/log/nginx/access.log*          # confirm names and the date range they cover
-bash inspect_access_logs.sh $(ls -1tr /var/log/nginx/access.log* ) > logs-report.txt
-# optional coarse client classes (apple-native / browser / script), never printing agents:
-CLIENT_CLASS=1 bash inspect_access_logs.sh /var/log/nginx/access.log > logs-report-classes.txt
+CLIENT_CLASS=1 bash inspect_access_logs.sh "/var/log/nginx/access.log" > logs-report-classes.txt
 ```
 
 It lists every method (including PUT and PATCH), aggregates non-read requests by method + normalised path +
@@ -88,13 +84,13 @@ Requests with no `limit` get 100 songs after deployment, so a client that never 
 first page. Cloudflare edge logs are not on the server. If the app logs elsewhere (journald, a different
 path), tell me the format instead of running anything else.
 
-## 5. What to send back
+## 4. What to send back
 
-Send, as text and after your own skim: `server-report.txt`, `db-report.txt`, `logs-report.txt`, plus the
-`sha256sum` output from step 1. Do not send tokens, passwords, environment files, raw log lines or database
+Send, as text and after your own skim: `server-report.txt`, `db-report.txt`, `logs-report.txt`, the runner's
+stdout, and the `sha256sum -c` output from step 1. Do not send tokens, passwords, environment files, raw log lines or database
 rows; none of the three reports should contain them, and if one does, tell me and do not paste it.
 
-## 6. What stays unchanged
+## 5. What stays unchanged
 
 Ingestion remains paused, external artwork verification remains disabled, and no live provider is called.
 Deployment, restart, configuration changes, migrations and production write tests each need your separate

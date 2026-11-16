@@ -185,6 +185,7 @@ main() {
   done
   for d in /opt/musicapp/app/frontend /home/rk/Music-App/frontend; do [ -e "$d/madineni" ] && echo "FOUND stray file $d/madineni (publicly served at /madineni)"; done
   echo; echo "Database: run scripts/inspect_live_db.sql separately (read-only catalogue queries); logs: scripts/inspect_access_logs.sh."
+  echo; echo "### end of server inspection"
 }
 
 main 2>&1 | scrub

@@ -77,4 +77,11 @@ WHERE c.oid = ANY (ARRAY[to_regclass('songs'), to_regclass('artists'), to_regcla
                          to_regclass('playlist_songs'), to_regclass('madineni_song_lyrics')]::oid[])
 ORDER BY 1;
 
+\echo '### transport of THIS session (pg_stat_ssl for the session running this inspection)'
+SELECT current_setting('ssl') AS server_ssl_setting,
+       COALESCE(s.ssl, false) AS this_session_uses_tls, s.version AS tls_version, s.cipher AS tls_cipher,
+       inet_server_addr() IS NULL AS unix_socket
+FROM (SELECT 1) x LEFT JOIN pg_stat_ssl s ON s.pid = pg_backend_pid();
+
 ROLLBACK;
+\echo '### end of catalogue inspection'
