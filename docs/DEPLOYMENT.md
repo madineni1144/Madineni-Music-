@@ -86,6 +86,10 @@ origin. `frontend-demo/madineni-home/*` is unchanged.
 `upload_report.py` - only path constants became environment-overridable; defaults are unchanged. They run
 only when the DAG is unpaused, which this change does not do.
 
+`audio_pipeline/scripts/ai_lyrics.py` (**new**, manual command-line tool; not part of the DAG and not deployed
+automatically) stores AI lyric drafts in new tables created by `database/migrations/001_ai_lyrics.sql`; see
+`docs/AI-LYRICS.md`. It needs `--apply` for every write and is not run by this change.
+
 ### Image build only (nothing deployed) 
 
 `airflow/Dockerfile` - declares the Google client, `psycopg2-binary`, `python-dotenv`. Build under a test
